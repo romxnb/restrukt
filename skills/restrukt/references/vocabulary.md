@@ -18,26 +18,41 @@
 | Термін | Означення |
 |---|---|
 | **точка входу** | місце, звідки виконання починається ззовні; знаходиться ґрепом |
-| **сценарій** | Use Case рівня моря за Кокберном: актор + дієслово + результат |
-| **маршрут** | файли і функції, якими сценарій іде від точки входу до кінця |
-| **контекст** | Bounded Context за Евансом: маршрути з однією мовою, тобто спільними термінами; одиниця словника, id `C1` |
+| **сценарій** | Use Case рівня моря за Кокберном: актор + дієслово + результат; винятки окремими сценаріями |
+| **маршрут** | файли і функції, якими сценарій іде від точки входу до кінця; записується історією, id `R1` |
+| **історія** | маршрут словами: Domain Storytelling, Гофер і Швентнер, as-is і дрібна зернистість; пронумеровані речення «хто → що робить → з чим», до 7 кроків, щаслива стежка, без ідентифікаторів у реченні; це модель, яку користувач перевіряє перед кандидатами. Історія **to-be** окремо не пишеться: її читають із хвостів «стане» |
+| **крок** | одне речення історії зі звіркою у хвості; id `R1.3`; на крок посилається колонка «де» |
+| **звірка** | хвіст кроку: крок проти коду, як два документи один проти одного; `символ@файл:рядок · =`, коли код каже те саме, або `зараз: символ n → стане: ім'я m · кошик`; Speculate about Design, OORP: гіпотеза згори, перевірка знизу |
+| **розбіжність** | звірка, що не дала `=`; має один із шести видів, кошиків; стає рядком плану |
+| **робочий об'єкт** | те, що історія передає з кроку в крок: замовлення, товар, платіж; іменники історій наповнюють словник |
+| **подія** | крок, після якого щось стало правдою: у «лапках», минулий час, Event Storming, Брандоліні; ім'я з коду через `=`, якщо є, інакше рядок кошика 2 |
+| **політика** | крок, що починається сам: «коли …, тоді …», Event Storming; актором є час або зовнішня система, не програма |
+| **перевірка** | крок «перевіряє …»: правило перед дією; Specification за Евансом; не стан |
+| **поворотна подія** | подія, яку читає інший контекст; позначка `⇢ C2` в кінці кроку; межа контексту за Брандоліні |
+| **виняток** | гілка, де історія не доходить до результату: окрема історія `R1x` до 3 кроків, за Кокберном, не гілка в головній |
+| **гаряча точка** | файл контексту з найбільшим добутком рядків на кількість змін у git за рік; Learn from the Past, OORP; Торнгілл |
+| **контекст** | Bounded Context за Евансом: маршрути з однією мовою, тобто спільними термінами; одиниця словника, id `C1`. Оркестратор ставить його як гіпотезу ґрепом; історії перевіряють: межа там, де історія міняє слова на той самий об'єкт або несе поворотну подію |
 | **підконтекст** | Modules за Евансом: маршрути контексту зі спільним файлом або станом, id `C1a`; одиниця узгодження і виконання, пачка. Контекст без підконтекстів сам є пачкою |
-| **кошик** | одна з шести груп пропозицій: слова, події, правила, межі, склад, місце; порядок кошиків є порядком виконання |
-| **пропозиція** | рядок плану: де, зараз, пропоную, чому, стан |
+| **кошик** | один із шести видів розбіжності між кроком і кодом: слова, події, правила, межі, склад, місце; порядок кошиків є порядком виконання |
+| **пропозиція** | рядок плану: де, зараз, стане, чому, розходиться з, стан |
 | **чому** | міра за connascence, Пейдж-Джонс: форма, ступінь, відстань, плюс рядки |
 | **шлях** | набір рядків на один прогін виконання; Most Valuable First |
 | **контракт** | що має лишитись правдою: наявні тести контексту і до п'яти поведінок; Characterization Test за Фезерсом |
 | **джерело мови** | документ проєкту з термінами: файл контексту агента, README, `docs/`, ADR; Ubiquitous Language за Евансом, не наказ |
 | **розходження** | пропоноване ім'я відрізняється від документного; показується з підставою, вирішує користувач, підтверджене править і документ |
-| **сходинка** | зрілість імені 0–6, Naming as a Process за Белші |
+| **сходинка** | зрілість імені за Naming as a Process, Белші: 0 немає · 1 нісенітниця · 2 чесне · 3 чесне і повне · 4 робить одне · 5 намір · 6 поняття домену; таблиця в `buckets.md` |
+| **DoD** | definition of done контексту: історія to-be читається з коду без перекладу; одинадцять пунктів у `apply.md` |
+| **діаграма** | mermaid там, де картинка коротша за прозу: після історії, у «Контекстах» як Context Map, під кошиками як «зараз / стане»; текст канонічний, діаграма його не повторює |
 
 ## Імена, які плагін цитує
 
-OORP, Демейер, Дюкасс, Нірштрас: Skim the Documentation · Read All the Code in One Hour · Study the Exceptional Entities · Analyze the Persistent Data · Speculate about Design · Tie Code and Questions · Chat with the Maintainers · Agree on Maxims · Most Valuable First · Fix Problems Not Symptoms · If It Ain't Broke Don't Fix It · Write Tests to Enable Evolution · Record Business Rules as Tests · Regression Test After Every Change · Always Have a Running Version · Migrate Systems Incrementally · Conserve Familiarity · Redistribute Responsibilities · Move Behavior Close to Data · Split Up God Class · Transform Conditionals to Polymorphism · Factor out Strategy · Detecting Duplicated Code.
+OORP, Демейер, Дюкасс, Нірштрас: Skim the Documentation · Read All the Code in One Hour · Step Through the Execution · Learn from the Past · Study the Exceptional Entities · Analyze the Persistent Data · Speculate about Design · Tie Code and Questions · Chat with the Maintainers · Agree on Maxims · Most Valuable First · Fix Problems Not Symptoms · If It Ain't Broke Don't Fix It · Write Tests to Enable Evolution · Record Business Rules as Tests · Regression Test After Every Change · Always Have a Running Version · Migrate Systems Incrementally · Conserve Familiarity · Redistribute Responsibilities · Move Behavior Close to Data · Split Up God Class · Transform Conditionals to Polymorphism · Factor out Strategy · Detecting Duplicated Code.
 
 Connascence, Пейдж-Джонс і Вайріх: Name · Type · Meaning · Position · Algorithm · Execution · Timing · Value · Identity; сила, ступінь, відстань.
 
-Лінзи кошиків: Linguistic Antipatterns, Арнаудова · Naming as a Process і Honest and Complete Name, Белші · Ubiquitous Language, Domain Event, Aggregate, Еванс · Policy, Брандоліні · Fail-safe defaults, Зальцер і Шредер · Module, Парнас · Screaming Architecture, Мартін · Divergent Change, каталог рефакторингів, Фаулер · Strangler Fig.
+Модель: Domain Storytelling, Гофер і Швентнер · Event Storming: команда, подія, політика, поворотна подія, hotspot, Брандоліні · Writing Effective Use Cases, Кокберн · Telling the Story of the System, Фезерс · гіпотеза згори, перевірка знизу, Брукс · Specification, Еванс · Your Code as a Crime Scene, Торнгілл · Tidy First і One Pile, Бек.
+
+Лінзи кошиків: Linguistic Antipatterns, 17 за групами A–F, Арнаудова, Пента, Антоніол · Naming as a Process, сім сходинок, і Honest and Complete Name, Белші · Ubiquitous Language, Domain Event, Aggregate, Еванс · Policy, Брандоліні · Fail-safe defaults, Зальцер і Шредер · Module, Парнас · Screaming Architecture, Мартін · Divergent Change, каталог рефакторингів, Фаулер · Strangler Fig.
 
 ## Види точок входу
 

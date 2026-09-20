@@ -1,0 +1,24 @@
+{
+  "name": "restrukt",
+  "version": "0.6.0",
+  "description": "Рефакторинг коду у три етапи: збір, узгодження, виконання пачкою.",
+  "author": {
+    "name": "romxnb"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "restrukt",
+    "shortDescription": "Три етапи реінжинірингу коду",
+    "longDescription": "Збирає історії маршрутів і пропозиції, узгоджує зміни з користувачем та виконує їх пачками.",
+    "developerName": "romxnb",
+    "category": "Developer tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "$restrukt scan для цього модуля",
+      "$restrukt status"
+    ]
+  }
+}
