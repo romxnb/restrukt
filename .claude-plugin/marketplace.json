@@ -1,13 +1,13 @@
 {
   "name": "restrukt",
   "owner": {
-    "name": "Roman"
+    "name": "romxnb"
   },
   "plugins": [
     {
       "name": "restrukt",
       "source": "./",
-      "description": "Ревізія коду: імена, події, правила, межі, склад і місце — швидка смуга й глибока."
+      "description": "Ревізія коду за три етапи — збір, узгодження, виконання. Хребет OORP, міра connascence."
     }
   ]
 }
