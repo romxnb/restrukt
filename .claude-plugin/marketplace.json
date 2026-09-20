@@ -1,0 +1,11 @@
+{
+  "name": "restrukt",
+  "owner": { "name": "Roman" },
+  "plugins": [
+    {
+      "name": "restrukt",
+      "source": "./",
+      "description": "Ревізія коду: інвентаризація, діагноз і реструктуризація архітектури."
+    }
+  ]
+}
