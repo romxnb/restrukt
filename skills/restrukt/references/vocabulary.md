@@ -11,7 +11,7 @@
 | 1 Збір | reverse engineering, design recovery | систему не змінює; піднімає висоту подання, а не переписує код іншою формою (redocumentation) |
 | 2 Узгодження | — | Chat with the Maintainers, OORP |
 | 3 Виконання | restructuring | поведінка та сама, форма інша |
-| Ревізія цілком | reengineering | |
+| restrukt цілком | reengineering | |
 
 ## Терміни плагіна
 
