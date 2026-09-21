@@ -1,15 +1,15 @@
 {
   "name": "restrukt",
-  "version": "0.6.0",
-  "description": "Рефакторинг коду у три етапи: збір, узгодження, виконання пачкою.",
+  "version": "0.7.0",
+  "description": "Реінжиніринг через повний атлас маршрутів, історії та семантичну трасованість коду.",
   "author": {
     "name": "romxnb"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "restrukt",
-    "shortDescription": "Три етапи реінжинірингу коду",
-    "longDescription": "Збирає історії маршрутів і пропозиції, узгоджує зміни з користувачем та виконує їх пачками.",
+    "shortDescription": "Атлас маршрутів і реінжиніринг",
+    "longDescription": "Будує повний атлас маршрутів, звіряє історії з кодом і перебудовує orchestration до семантичної трасованості.",
     "developerName": "romxnb",
     "category": "Developer tools",
     "capabilities": [
