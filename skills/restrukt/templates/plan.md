@@ -1,8 +1,8 @@
 # План restrukt: <проєкт>
 
-<дата> · N файлів · N точок входу · N бізнес-сценаріїв · N опор · N контекстів · N пропозицій · тестів N · час: оркестратор N хв · збирач N · атлас і графи N · сканери N · перевірка N · злиття N
+<дата> · N файлів · N точок входу · N бізнес-сценаріїв · N опор · N контекстів · N пропозицій · тестів N · час: оркестратор N хв · збирач N · атлас N · сканери N · перевірка N · збирання N
 
-Межа атласу: `<application inbound adapters | public API модуля/library>` · обсяг: `<шлях>` · атлас: `docs/restrukt/atlas.md`
+Межа атласу: `<application inbound adapters | public API модуля/library>` · обсяг: `<шлях>` · індекс: [atlas.md](atlas.md)
 
 Основа: commit `<sha>` або «без git» · робоче дерево без `docs/restrukt/`: чисто або `<git status --short>`
 
@@ -10,13 +10,13 @@
 
 ## Контексти
 
-Межа там, де історія міняє слова на той самий об'єкт або несе `⇢`. Історії кожного контексту — `docs/restrukt/stories/Cn.md`.
+Межа там, де історія міняє слова на той самий об'єкт або несе `⇢`. Кожен контекст має свій файл: `docs/restrukt/contexts/Cn.md`.
 
-| id | назва | сценарії | файли | гаряча точка | історії | пропозицій |
+| id | назва | сценарії | файли | гаряча точка | файл контексту | пропозицій |
 |---|---|---|---|---|---|---|
 | C1 | замовлення: спільні слова order, stock, shipping | | | | | |
-| C1a | оформлення | S1 покупець оформлює · S2 менеджер оформлює за покупця | `Checkout.ts`, `OrderService.ts` | `OrderService.ts` 610 × 27 | `stories/C1a.md` · 2 з 5 кроків = | 14 |
-| C1b | відвантаження | S6 склад відвантажує | `Shipping.ts` | `Shipping.ts` 480 × 9 | `stories/C1b.md` · 4 з 4 = | 9 |
+| C1a | оформлення | S1 покупець оформлює · S2 менеджер оформлює за покупця | `Checkout.ts`, `OrderService.ts` | `OrderService.ts` 610 × 27 | [C1a.md](contexts/C1a.md) · 2 з 5 кроків = | 14 |
+| C1b | відвантаження | S6 склад відвантажує | `Shipping.ts` | `Shipping.ts` 480 × 9 | [C1b.md](contexts/C1b.md) · 4 з 4 = | 9 |
 | C2 | оплата | S9 повернення коштів | `PaymentGateway.ts` | `PaymentGateway.ts` 210 × 6 | атлас | — |
 
 ```mermaid
@@ -30,7 +30,7 @@ flowchart LR
   end
   C1a -.->|«замовлення оформлено»| C1b
   PG -.->|«оплату проведено»| C1a
-  OS[/OrderService.ts: C1a · C2/] --- C1a
+  OS>OrderService.ts: C1a · C2] --- C1a
   OS --- PG
 ```
 
@@ -60,9 +60,9 @@ flowchart LR
 
 `CLAUDE.md` · `docs/glossary.md` · `docs/adr/*.md` — або «не виявлено». Словник: N слів заборон · N збігів в обсязі — або «словника немає».
 
-## Драйвери й місце збирання
+## Зовнішні системи й місце збирання
 
-Драйвери: `fetch` 3 файли · `pg` 2 · `Date.now` 4 — або «не виявлено». Місце збирання: `main.ts:12`, контейнер: ручне — або «не знайдено».
+Зовнішні системи обсягу: `fetch` 3 файли · `pg` 2 · `Date.now` 4 — або «не виявлено». Місце збирання: `main.ts:12`, контейнер: ручне — або «не знайдено».
 
 ## Тести
 
@@ -72,11 +72,11 @@ flowchart LR
 
 ## C1a · Оформлення
 
-Контракт: `OrderServiceTests.ts` 12 · `ShippingPolicyTests.ts` 6. Поведінки: після скасування резерв знімається, оплата повертається · … Повний перелік — `stories/C1a.md`.
+Контракт: `OrderServiceTests.ts` 12 · `ShippingPolicyTests.ts` 6. Поведінки: після скасування резерв знімається, оплата повертається · … Повний перелік і Domain Story — [contexts/C1a.md](contexts/C1a.md).
 
 Гаряча точка: `OrderService.ts` 610 × 27. Orchestration home: немає — кроки S1 живуть у `Checkout.ts` і `OrderService.ts` → C1a.4a.
 
-Зовнішні системи: банк · порт немає · `PaymentGateway.ts:12` кличе `fetch` з `OrderService.create` → C1a.7 · склад · порт `WarehousePort` · адаптер `WarehouseHttp.ts` · S1.5.
+Зовнішні системи: банк · порт немає · `OrderService.ts:140` кличе `fetch` → C1a.7 · склад · порт `WarehousePort` · адаптер `WarehouseHttp.ts` · S1.4.
 
 ### Імена
 

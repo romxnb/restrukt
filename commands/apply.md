@@ -5,11 +5,11 @@ argument-hint: "[контекст або підконтекст, наприкл�
 
 Виконай план restrukt. Контексти: $1
 
-Прочитай `docs/restrukt/plan.md`: шапку, «Контексти», «Драйвери й місце збирання», «Тести». Немає плану — запропонуй `/restrukt:plan` і зупинись. Немає жодного рядка `так` або `змінено` — проведи узгодження за `${CLAUDE_PLUGIN_ROOT}/skills/restrukt/references/qa.md`.
+Прочитай `docs/restrukt/plan.md`: шапку, «Контексти», «Зовнішні системи й місце збирання», «Тести». Немає плану — запропонуй `/restrukt:plan` і зупинись. Немає жодного рядка `так` або `змінено` — проведи узгодження за `${CLAUDE_PLUGIN_ROOT}/skills/restrukt/references/qa.md`.
 
 Прочитай `references/apply.md`. Для кожного обраного незалежного контексту — три кроки по черзі; незалежні контексти паралельно, залежні по черзі:
 
-1. `restrukt-cutter` у режимі **рецепт**: шлях до плану і `stories/Cn.md`, id контексту, швидкий контракт, повний suite, абсолютні шляхи до `references/scenarios.md`, `apply.md`, `buckets.md`, `templates/recipe.md`, `templates/log.md`. Рецепт порожній — контекст завершено або чекає декомпозиції; покажи причини і зупинись.
+1. `restrukt-cutter` у режимі **рецепт**: шлях до плану, до `contexts/Cn.md` і до теки `contexts/Cn/`, id контексту, швидкий контракт, повний suite, абсолютні шляхи до `references/scenarios.md`, `apply.md`, `buckets.md`, `templates/recipe.md`, `templates/log.md`. Рецепт порожній — контекст завершено або чекає декомпозиції; покажи причини і зупинись.
 2. `restrukt-builder`: шлях до `recipe.Cn.md` і `log.md`, швидкий контракт, повний suite, абсолютні шляхи до `references/apply.md` і `templates/log.md`.
 3. `restrukt-cutter` у режимі **вердикт**: те саме, що в кроці 1, плюс шлях до рецепта.
 
