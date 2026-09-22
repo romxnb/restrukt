@@ -21,4 +21,4 @@
 
 Не переписуй весь застосунок до першої перевірки й не вимагай повного покриття всього репозиторію перед першою частиною.
 
-Вибрано з [Object-Oriented Reengineering Patterns](https://scg.unibe.ch/assets/archive/books/OORP-2013-11-27.pdf): Write Tests to Enable Evolution; Test the Interface, Not the Implementation; Migrate Systems Incrementally.
+Вибрано з [Object-Oriented Reengineering Patterns](https://scg.unibe.ch/assets/archive/books/OORP-2013-11-27.pdf): Write Tests to Enable Evolution; Test the Interface, Not the Implementation; Migrate Systems Incrementally. Безпечні малі behavior-preserving кроки міграції також спираються на [Refactoring, 2nd ed., Martin Fowler with Kent Beck](https://martinfowler.com/books/refactoring.html); це джерело техніки переходу, не цільової архітектури.
