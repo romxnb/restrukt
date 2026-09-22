@@ -74,7 +74,7 @@ def check(root: Path) -> list[str]:
         return body
 
     skill = frontmatter("skills/restrukt/SKILL.md", "restrukt")
-    for mode in ("run", "plan", "apply", "refine", "status"):
+    for mode in ("run", "plan", "apply", "loop", "step", "refine", "status"):
         relative = f"commands/{mode}.md"
         body = frontmatter(relative)
         require(f"`{mode}`" in body, f"{relative}: wrong mode routing")
@@ -84,6 +84,16 @@ def check(root: Path) -> list[str]:
         require(f"/restrukt:{mode}" in skill, f"Skill does not expose {mode}")
     for path in sorted((root / "agents").glob("*.md")):
         frontmatter(str(path.relative_to(root)), path.stem)
+
+    # The Ralph loop runs one step per session, so its runner must stay executable.
+    runner = root / "scripts/restrukt_loop.sh"
+    require(runner.is_file(), "Missing loop runner: scripts/restrukt_loop.sh")
+    if runner.is_file():
+        require(runner.stat().st_mode & 0o111 != 0, "Loop runner is not executable")
+        require(
+            "restrukt_loop.sh" in (root / "skills/restrukt/references/loop.md").read_text(encoding="utf-8"),
+            "Loop reference does not name the runner",
+        )
 
     # Resolve Markdown links; external links and same-document anchors need no file lookup.
     documents = [root / "README.md"]
@@ -116,5 +126,5 @@ if __name__ == "__main__":
         for failure in failures:
             print(f"FAIL: {failure}")
         sys.exit(1)
-    print("PASS: manifests, entry points, command routing and local links")
+    print("PASS: manifests, entry points, command routing, loop runner and local links")
     print("Agent behavior and generated code quality require acceptance runs.")

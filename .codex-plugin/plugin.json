@@ -1,6 +1,6 @@
 {
   "name": "restrukt",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "Перебудова застосунку або його частини в зрозумілий, архітектурно цілісний код із перевіреною поведінкою.",
   "author": {
     "name": "romxnb"
@@ -19,6 +19,7 @@
     "defaultPrompt": [
       "$restrukt для цього застосунку",
       "$restrukt plan для цього модуля",
+      "$restrukt loop для збереженого плану",
       "$restrukt status"
     ]
   }
