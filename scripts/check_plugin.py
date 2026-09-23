@@ -74,7 +74,10 @@ def check(root: Path) -> list[str]:
         return body
 
     skill = frontmatter("skills/restrukt/SKILL.md", "restrukt")
-    for mode in ("run", "plan", "apply", "refine", "status"):
+    modes = {"plan", "apply", "review", "refine", "status"}
+    command_names = {path.stem for path in (root / "commands").glob("*.md")}
+    require(command_names == modes, "Command set must match supported modes")
+    for mode in sorted(modes):
         relative = f"commands/{mode}.md"
         body = frontmatter(relative)
         require(f"`{mode}`" in body, f"{relative}: wrong mode routing")
