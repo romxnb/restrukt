@@ -30,8 +30,10 @@ def prepare(scenario: str, project: Path) -> None:
     shutil.copytree(FIXTURE / "app", project, ignore=shutil.ignore_patterns("__pycache__"))
     subprocess.run(["git", "init", "-q"], cwd=project, check=True)
     commit(project, "основа")
-    if (source / "code").is_dir():
-        shutil.copytree(source / "code", project, dirs_exist_ok=True)
+    overlay = source / "overlay.txt"
+    if overlay.is_file():
+        # Code after the finished tasks is shared by several plan states.
+        shutil.copytree(FIXTURE / "overlays" / overlay.read_text().strip(), project, dirs_exist_ok=True)
         commit(project, "виконані задачі")
 
     # Plans are working documents: like in a user's repository they stay uncommitted.
