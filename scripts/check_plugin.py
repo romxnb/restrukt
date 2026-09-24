@@ -160,5 +160,5 @@ if __name__ == "__main__":
         for failure in failures:
             print(f"FAIL: {failure}")
         sys.exit(1)
-    print("PASS: manifests, entry points, command routing and local links")
+    print("PASS: manifests, entry points, command routing, state legends and local links")
     print("Agent behavior and generated code quality require acceptance runs.")
