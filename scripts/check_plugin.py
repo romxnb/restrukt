@@ -88,8 +88,9 @@ def check(root: Path) -> list[str]:
         frontmatter(str(path.relative_to(root)), path.stem)
 
     # The plan template repeats the contract's state legends so a plan explains itself; copies must not drift.
+    # Plan sections may carry a number ("## 6. Задачі"); the name stays the address.
     def state_legend(relative: str, body: str, heading: str, label: str) -> list[str]:
-        section = re.search(rf"^## {re.escape(heading)}\n(.*?)(?=^## |\Z)", body, flags=re.M | re.S)
+        section = re.search(rf"^## (?:\d+\. )?{re.escape(heading)}\n(.*?)(?=^## |\Z)", body, flags=re.M | re.S)
         sentence = section and re.search(rf"^{re.escape(label)}(.*?)\.(?:\s|$)", section[1], flags=re.M)
         if not sentence:
             errors.append(f"{relative}: missing state legend {label!r} in section {heading!r}")
@@ -109,7 +110,17 @@ def check(root: Path) -> list[str]:
             f"{template_path}: {states} differ from the contract",
         )
 
-    # Resolve Markdown links; external links and same-document anchors need no file lookup.
+    # Same-document anchors follow the heading slug rule that Zed and JetBrains previews share.
+    def slug(heading: str) -> str:
+        return re.sub(r"[^\w\- ]", "", heading.strip().lower()).replace(" ", "-")
+
+    def anchors(body: str) -> tuple[set[str], list[str]]:
+        prose = re.sub(r"^```.*?^```", "", body, flags=re.M | re.S)
+        prose = re.sub(r"`[^`\n]*`", "", prose)
+        headings = {slug(h) for h in re.findall(r"^#{1,6} (.+)$", prose, flags=re.M)}
+        return headings, re.findall(r"\]\(#([^)\s]+)\)", prose)
+
+    # Resolve Markdown links; external links need no file lookup.
     documents = [root / "README.md"]
     links: dict[Path, set[Path]] = {}
     for directory in ("skills", "agents", "commands", "tests"):
@@ -119,6 +130,9 @@ def check(root: Path) -> list[str]:
             errors.append(f"Missing document: {path.relative_to(root)}")
             continue
         body = path.read_text(encoding="utf-8")
+        headings, targets = anchors(body)
+        for target in targets:
+            require(unquote(target) in headings, f"{path.relative_to(root)}: broken anchor: #{target}")
         for target in re.findall(r"\[[^\]\n]*\]\(([^)\n]+)\)", body):
             target = target.strip().strip("<>")
             parsed = urlsplit(target)
@@ -160,5 +174,5 @@ if __name__ == "__main__":
         for failure in failures:
             print(f"FAIL: {failure}")
         sys.exit(1)
-    print("PASS: manifests, entry points, command routing, state legends and local links")
+    print("PASS: manifests, entry points, command routing, state legends, local links and anchors")
     print("Agent behavior and generated code quality require acceptance runs.")

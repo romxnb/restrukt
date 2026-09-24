@@ -111,6 +111,18 @@ class PackageContractTests(unittest.TestCase):
         errors = checker.check(self.root)
         self.assertTrue(any(e.startswith("skills/restrukt/SKILL.md: missing state legend") for e in errors))
 
+    def test_template_anchor_must_name_a_heading(self):
+        path = self.root / "skills/restrukt/templates/plan.md"
+        path.write_text(path.read_text().replace("## 6. Задачі", "## 6. Черга"))
+        self.assertTrue(any(
+            e.startswith("skills/restrukt/templates/plan.md: broken anchor: #6-задачі") for e in checker.check(self.root)
+        ))
+
+    def test_numbered_template_section_keeps_its_state_legend(self):
+        path = self.root / "skills/restrukt/templates/plan.md"
+        self.assertIn("## 6. Задачі\n", path.read_text())
+        self.assertEqual(checker.check(self.root), [])
+
     def test_manifest_versions_must_match(self):
         path = self.root / ".codex-plugin/plugin.json"
         data = json.loads(path.read_text())
