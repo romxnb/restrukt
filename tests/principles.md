@@ -15,14 +15,20 @@
 | Порти за потребою, ізоляція протоколу, помилки, порядок ефектів і перевірка адаптера | [ports](../skills/restrukt/methods/ports.md) | Методика незмінна |
 | Захист до заміни, тести інтерфейсу, реальні входи, видалення й тимчасові мости | [migration](../skills/restrukt/methods/migration.md) | Методика незмінна; одна задача завершує цикл |
 | П'ять тактичних питань, ознаки, дії та винятки | [implementation](../skills/restrukt/methods/implementation.md) | Усі п'ять збережені; винятки для DTO, примітивів, типів, конкурентності, помилок, boolean, атомарних операцій, DRY, розміру й адаптерів присутні |
-| Перевірка використання, життєвого циклу й ефектів; тести не закріплюють приватну форму | [implementation](../skills/restrukt/methods/implementation.md) | Потрібні викликачі й альтернативи охоплені; стилістична квота не введена |
+| Перевірка використання, життєвого циклу й ефектів; тести не закріплюють приватну форму | [caller-check](../skills/restrukt/methods/caller-check.md) | Винесено з implementation без зміни змісту; потрібні викликачі й альтернативи охоплені; стилістична квота не введена |
 | Semantic naming, structural fix перед перейменуванням | [apply](../skills/restrukt/references/apply.md), [names](../skills/restrukt/tools/names.md) | Цикл задачі зберігає всі рівні імен; інструмент names незмінний |
-| Design convergence та adversarial review | [plan](../skills/restrukt/references/plan.md), [apply](../skills/restrukt/references/apply.md), [review](../skills/restrukt/references/review.md) | Зведення має задачу-виконавця; незалежний review охоплює всі попередні ознаки дефекту |
+| Design convergence та adversarial review | [plan](../skills/restrukt/references/plan.md), [apply](../skills/restrukt/references/apply.md), [review](../skills/restrukt/references/review.md), [review-code](../skills/restrukt/references/review-code.md) | Зведення має задачу-виконавця; незалежний review охоплює всі попередні ознаки дефекту |
 | Самостійність, дозволи за наслідком, початкові правки й обсяг | [контракт](../skills/restrukt/SKILL.md) | Три рівні рішень, збереження стороннього й конкретні підстави питань лишилися |
-| Продовження, застарілий стан, архівування старих форматів та іншого обсягу | [контракт](../skills/restrukt/SKILL.md), [continuation](../skills/restrukt/references/continuation.md) | Винесено рідкісні випадки; актуальний код важливіший за стару позначку |
+| Продовження, застарілий стан, архівування старих форматів; окрема тека для кожного обсягу | [контракт](../skills/restrukt/SKILL.md), [continuation](../skills/restrukt/references/continuation.md) | Винесено рідкісні випадки; актуальний код важливіший за стару позначку |
 | Один фокус refine без прихованого розширення | [refine](../skills/restrukt/references/refine.md), [coupling](../skills/restrukt/tools/coupling.md) | Межі збережені; інструмент coupling незмінний |
 | Необов'язкові помічники, неперетин записів, один автор документів, інтеграція | [runtime](../skills/restrukt/references/runtime.md), [worker](../agents/restrukt-worker.md) | Правила діють на поточний виклик; новий самостійний виконавець може успадкувати відповідальність |
 | Спільний бюджет, докази перевірок, чесне незавершення, без вигаданих метрик | [контракт](../skills/restrukt/SKILL.md), [runtime](../skills/restrukt/references/runtime.md), [журнал](../skills/restrukt/templates/log.md) | Збережені умови завершення та передачі стану |
+
+## Поступове розкриття
+
+- `review` лише маршрутизує: `review plan` читає [review-plan](../skills/restrukt/references/review-plan.md), `review code` — [review-code](../skills/restrukt/references/review-code.md).
+- Перевірку придатності до передачі винесено в [handoff](../skills/restrukt/references/handoff.md): її читають `plan` на кроці 5 і `review plan`, без повного довідника `plan`.
+- Перевірку з боку викликача винесено в [caller-check](../skills/restrukt/methods/caller-check.md): `review code` не завантажує тактичний дизайн цілком.
 
 ## Навмисно змінений workflow
 

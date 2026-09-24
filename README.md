@@ -7,7 +7,7 @@
 | Задача | Claude Code | Codex |
 |---|---|---|
 | Створити план | `/restrukt:plan [обсяг]` | `$restrukt plan [обсяг]` |
-| Реалізувати одну задачу | `/restrukt:apply [назва]` | `$restrukt apply [назва]` |
+| Реалізувати одну задачу | `/restrukt:apply [план] [задача]` | `$restrukt apply [план] [задача]` |
 | Перевірити задум | `/restrukt:review plan` | `$restrukt review plan` |
 | Перевірити зібрану систему | `/restrukt:review` | `$restrukt review` |
 | Доопрацювати конкретний недолік | `/restrukt:refine [names або coupling] [обсяг]` | `$restrukt refine [names або coupling] [обсяг]` |
@@ -26,7 +26,7 @@
 
 ## План і самостійність
 
-Робоча пам'ять — `docs/restrukt/plan.md` та `docs/restrukt/log.md`. План зберігає правила, рішення, контракти задач, залежності й стан. Журнал — фактичні результати та перевірки. Спільне знання описується один раз; задача посилається на потрібний контекст.
+Робоча пам'ять — `docs/restrukt/<назва>/plan.md` та `log.md`: кожен обсяг має власну теку, тож кілька планів співіснують. Інші режими обирають план за назвою теки, обсягом або задачею; за неоднозначності уточнюють. План зберігає правила, рішення, контракти задач, залежності й стан. Журнал — фактичні результати та перевірки. Спільне знання описується один раз; задача посилається на потрібний контекст.
 
 Поведінка, сумісність і явні обмеження користувача задають рамки. Агент може переглянути власне архітектурне рішення за новими доказами, оновивши залежні задачі; типи, функції й розташування файлів обирає самостійно. Погодження плану не фіксує всі деталі. Питання потрібне для невідомого продуктового результату чи дії поза дозволом. Коміт, публікація та міграція реальних даних потребують доручення.
 
@@ -61,8 +61,8 @@ codex plugin marketplace add ./
 
 ## Устрій і перевірка
 
-- [Головний контракт](skills/restrukt/SKILL.md); [plan](skills/restrukt/references/plan.md), [apply](skills/restrukt/references/apply.md), [review](skills/restrukt/references/review.md), [критерії архітектури](skills/restrukt/references/architecture.md).
-- Методики: [історії](skills/restrukt/methods/stories.md), [неявні правила](skills/restrukt/methods/implicit.md), [проєктування](skills/restrukt/methods/design.md), [власність](skills/restrukt/methods/ownership.md), [зовнішні контракти](skills/restrukt/methods/ports.md), [тактичний дизайн](skills/restrukt/methods/implementation.md), [перевірена заміна](skills/restrukt/methods/migration.md).
+- [Головний контракт](skills/restrukt/SKILL.md); [plan](skills/restrukt/references/plan.md), [apply](skills/restrukt/references/apply.md), [review](skills/restrukt/references/review.md) ([план](skills/restrukt/references/review-plan.md), [код](skills/restrukt/references/review-code.md)), [придатність до передачі](skills/restrukt/references/handoff.md), [критерії архітектури](skills/restrukt/references/architecture.md).
+- Методики: [історії](skills/restrukt/methods/stories.md), [неявні правила](skills/restrukt/methods/implicit.md), [проєктування](skills/restrukt/methods/design.md), [власність](skills/restrukt/methods/ownership.md), [зовнішні контракти](skills/restrukt/methods/ports.md), [тактичний дизайн](skills/restrukt/methods/implementation.md), [перевірка з боку викликача](skills/restrukt/methods/caller-check.md), [перевірена заміна](skills/restrukt/methods/migration.md).
 - [Refine](skills/restrukt/references/refine.md): [імена](skills/restrukt/tools/names.md), [зв'язаність](skills/restrukt/tools/coupling.md).
 - [Передача й делегування](skills/restrukt/references/runtime.md); [план](skills/restrukt/templates/plan.md), [журнал](skills/restrukt/templates/log.md).
 - [Сценарії приймання](tests/acceptance.md) і [збереження принципів](tests/principles.md) призначені для перевірки плагіна, не для завантаження під час кожної задачі.

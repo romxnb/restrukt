@@ -48,7 +48,18 @@ class PackageContractTests(unittest.TestCase):
         (self.root / "skills/restrukt/methods/implementation.md").unlink()
         errors = checker.check(self.root)
         self.assertTrue(any("references/apply.md: broken link:" in e for e in errors))
-        self.assertTrue(any("references/review.md: broken link:" in e for e in errors))
+
+    def test_missing_caller_check_breaks_apply_and_code_review(self):
+        (self.root / "skills/restrukt/methods/caller-check.md").unlink()
+        errors = checker.check(self.root)
+        self.assertTrue(any("references/apply.md: broken link:" in e for e in errors))
+        self.assertTrue(any("references/review-code.md: broken link:" in e for e in errors))
+
+    def test_missing_handoff_check_breaks_plan_and_plan_review(self):
+        (self.root / "skills/restrukt/references/handoff.md").unlink()
+        errors = checker.check(self.root)
+        self.assertTrue(any("references/plan.md: broken link:" in e for e in errors))
+        self.assertTrue(any("references/review-plan.md: broken link:" in e for e in errors))
 
     def test_manifest_versions_must_match(self):
         path = self.root / ".codex-plugin/plugin.json"

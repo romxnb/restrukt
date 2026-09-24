@@ -1,7 +1,8 @@
 ---
 description: Показати задачі, перешкоди й стан перевірки цілого
+argument-hint: "[план; без нього — усі плани]"
 ---
 
-Прочитай `${CLAUDE_PLUGIN_ROOT}/skills/restrukt/SKILL.md` і виконай режим `status`.
+Прочитай `${CLAUDE_PLUGIN_ROOT}/skills/restrukt/SKILL.md` і виконай режим `status` з аргументами: $ARGUMENTS
 
 Якщо змінна шляху недоступна, знайди `skills/restrukt/SKILL.md` від кореня плагіна. Дотримуйся головного контракту й довідника обраного режиму.
