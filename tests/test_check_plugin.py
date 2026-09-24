@@ -84,6 +84,28 @@ class PackageContractTests(unittest.TestCase):
         errors = checker.check(self.root)
         self.assertTrue(any(e.startswith("Link cycle:") and "review-code.md" in e for e in errors))
 
+    def test_template_task_states_must_match_contract(self):
+        path = self.root / "skills/restrukt/templates/plan.md"
+        path.write_text(path.read_text().replace("`готово`, `заблоковано", "`готово`, `перевірити`, `заблоковано"))
+        self.assertIn(
+            "skills/restrukt/templates/plan.md: task states differ from the contract",
+            checker.check(self.root),
+        )
+
+    def test_template_whole_check_states_must_match_contract(self):
+        path = self.root / "skills/restrukt/templates/plan.md"
+        path.write_text(path.read_text().replace("`потребує виправлень`", "`є знахідки`"))
+        self.assertIn(
+            "skills/restrukt/templates/plan.md: whole-check states differ from the contract",
+            checker.check(self.root),
+        )
+
+    def test_contract_must_own_state_legends(self):
+        path = self.root / "skills/restrukt/SKILL.md"
+        path.write_text(path.read_text().replace("## Стан плану", "## Стани"))
+        errors = checker.check(self.root)
+        self.assertTrue(any(e.startswith("skills/restrukt/SKILL.md: missing state legend") for e in errors))
+
     def test_manifest_versions_must_match(self):
         path = self.root / ".codex-plugin/plugin.json"
         data = json.loads(path.read_text())

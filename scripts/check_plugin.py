@@ -88,6 +88,28 @@ def check(root: Path) -> list[str]:
     for path in sorted((root / "agents").glob("*.md")):
         frontmatter(str(path.relative_to(root)), path.stem)
 
+    # The plan template repeats the contract's state legends so a plan explains itself; copies must not drift.
+    def state_legend(relative: str, body: str, heading: str, label: str) -> list[str]:
+        section = re.search(rf"^## {re.escape(heading)}\n(.*?)(?=^## |\Z)", body, flags=re.M | re.S)
+        sentence = section and re.search(rf"^{re.escape(label)}(.*?)\.(?:\s|$)", section[1], flags=re.M)
+        if not sentence:
+            errors.append(f"{relative}: missing state legend {label!r} in section {heading!r}")
+            return []
+        return re.findall(r"`([^`]+)`", sentence[1])
+
+    template_path = "skills/restrukt/templates/plan.md"
+    template = (root / template_path).read_text(encoding="utf-8") if (root / template_path).is_file() else ""
+    for contract_label, template_heading, template_label, states in (
+        ("Задача:", "Задачі", "Стани:", "task states"),
+        ("«Перевірка цілого»:", "Перевірка цілого", "Стан:", "whole-check states"),
+    ):
+        expected = state_legend("skills/restrukt/SKILL.md", skill, "Стан плану", contract_label)
+        actual = state_legend(template_path, template, template_heading, template_label)
+        require(
+            not expected or not actual or expected == actual,
+            f"{template_path}: {states} differ from the contract",
+        )
+
     # Resolve Markdown links; external links and same-document anchors need no file lookup.
     documents = [root / "README.md"]
     links: dict[Path, set[Path]] = {}
