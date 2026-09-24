@@ -82,8 +82,7 @@ def check(root: Path) -> list[str]:
         body = frontmatter(relative)
         require(f"`{mode}`" in body, f"{relative}: wrong mode routing")
         require("${CLAUDE_PLUGIN_ROOT}/skills/restrukt/SKILL.md" in body, f"{relative}: missing skill entry")
-        if mode != "status":
-            require("$ARGUMENTS" in body, f"{relative}: arguments are not forwarded")
+        require("$ARGUMENTS" in body, f"{relative}: arguments are not forwarded")
         require(f"/restrukt:{mode}" in skill, f"Skill does not expose {mode}")
     for path in sorted((root / "agents").glob("*.md")):
         frontmatter(str(path.relative_to(root)), path.stem)

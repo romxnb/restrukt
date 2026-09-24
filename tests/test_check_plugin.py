@@ -44,6 +44,11 @@ class PackageContractTests(unittest.TestCase):
         path.write_text(path.read_text().replace("`review`", "`apply`"))
         self.assertIn("commands/review.md: wrong mode routing", checker.check(self.root))
 
+    def test_status_must_forward_arguments(self):
+        path = self.root / "commands/status.md"
+        path.write_text(path.read_text().replace("$ARGUMENTS", ""))
+        self.assertIn("commands/status.md: arguments are not forwarded", checker.check(self.root))
+
     def test_missing_tactical_method_breaks_its_consumers(self):
         (self.root / "skills/restrukt/methods/implementation.md").unlink()
         errors = checker.check(self.root)
