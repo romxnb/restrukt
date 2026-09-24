@@ -74,7 +74,7 @@ def check(root: Path) -> list[str]:
         return body
 
     skill = frontmatter("skills/restrukt/SKILL.md", "restrukt")
-    modes = {"plan", "apply", "review", "refine", "status"}
+    modes = {"plan", "implement", "apply", "review", "refine", "status"}
     command_names = {path.stem for path in (root / "commands").glob("*.md")}
     require(command_names == modes, "Command set must match supported modes")
     for mode in sorted(modes):
@@ -90,6 +90,7 @@ def check(root: Path) -> list[str]:
 
     # Resolve Markdown links; external links and same-document anchors need no file lookup.
     documents = [root / "README.md"]
+    links: dict[Path, set[Path]] = {}
     for directory in ("skills", "agents", "commands", "tests"):
         documents.extend((root / directory).rglob("*.md"))
     for path in documents:
@@ -105,6 +106,25 @@ def check(root: Path) -> list[str]:
             destination = (path.parent / unquote(parsed.path)).resolve()
             require(destination.is_relative_to(root.resolve()), f"{path.relative_to(root)}: link leaves plugin: {target}")
             require(destination.exists(), f"{path.relative_to(root)}: broken link: {target}")
+            if destination.suffix == ".md" and destination.is_file() and destination != path.resolve():
+                links.setdefault(path.resolve(), set()).add(destination)
+
+    # Agents read documents top-down; a link cycle hides which file owns a rule.
+    done: set[Path] = set()
+
+    def find_cycle(node: Path, trail: list[Path]) -> None:
+        if node in trail:
+            cycle = trail[trail.index(node):] + [node]
+            errors.append("Link cycle: " + " -> ".join(str(p.relative_to(root.resolve())) for p in cycle))
+            return
+        if node in done:
+            return
+        for nxt in sorted(links.get(node, ())):
+            find_cycle(nxt, trail + [node])
+        done.add(node)
+
+    for start in sorted(links):
+        find_cycle(start, [])
 
     return errors
 

@@ -61,6 +61,29 @@ class PackageContractTests(unittest.TestCase):
         self.assertTrue(any("references/plan.md: broken link:" in e for e in errors))
         self.assertTrue(any("references/review-plan.md: broken link:" in e for e in errors))
 
+    def test_missing_task_rules_break_plan_and_implement(self):
+        (self.root / "skills/restrukt/references/tasks.md").unlink()
+        errors = checker.check(self.root)
+        self.assertTrue(any("references/plan.md: broken link:" in e for e in errors))
+        self.assertTrue(any("references/implement.md: broken link:" in e for e in errors))
+
+    def test_missing_implement_reference_breaks_its_entry(self):
+        (self.root / "skills/restrukt/references/implement.md").unlink()
+        errors = checker.check(self.root)
+        self.assertTrue(any("SKILL.md: broken link:" in e for e in errors))
+
+    def test_missing_naming_principle_breaks_all_consumers(self):
+        (self.root / "skills/restrukt/methods/naming.md").unlink()
+        errors = checker.check(self.root)
+        for consumer in ("references/apply.md", "references/plan.md", "references/review-code.md", "tools/names.md"):
+            self.assertTrue(any(f"{consumer}: broken link:" in e for e in errors), consumer)
+
+    def test_link_cycle_is_rejected(self):
+        path = self.root / "skills/restrukt/references/review-code.md"
+        path.write_text(path.read_text() + "\nСпільні умови — у [review](review.md).\n")
+        errors = checker.check(self.root)
+        self.assertTrue(any(e.startswith("Link cycle:") and "review-code.md" in e for e in errors))
+
     def test_manifest_versions_must_match(self):
         path = self.root / ".codex-plugin/plugin.json"
         data = json.loads(path.read_text())

@@ -16,9 +16,9 @@
 | Захист до заміни, тести інтерфейсу, реальні входи, видалення й тимчасові мости | [migration](../skills/restrukt/methods/migration.md) | Методика незмінна; одна задача завершує цикл |
 | П'ять тактичних питань, ознаки, дії та винятки | [implementation](../skills/restrukt/methods/implementation.md) | Усі п'ять збережені; винятки для DTO, примітивів, типів, конкурентності, помилок, boolean, атомарних операцій, DRY, розміру й адаптерів присутні |
 | Перевірка використання, життєвого циклу й ефектів; тести не закріплюють приватну форму | [caller-check](../skills/restrukt/methods/caller-check.md) | Винесено з implementation без зміни змісту; потрібні викликачі й альтернативи охоплені; стилістична квота не введена |
-| Semantic naming, structural fix перед перейменуванням | [apply](../skills/restrukt/references/apply.md), [names](../skills/restrukt/tools/names.md) | Цикл задачі зберігає всі рівні імен; інструмент names незмінний |
-| Design convergence та adversarial review | [plan](../skills/restrukt/references/plan.md), [apply](../skills/restrukt/references/apply.md), [review](../skills/restrukt/references/review.md), [review-code](../skills/restrukt/references/review-code.md) | Зведення має задачу-виконавця; незалежний review охоплює всі попередні ознаки дефекту |
-| Самостійність, дозволи за наслідком, початкові правки й обсяг | [контракт](../skills/restrukt/SKILL.md) | Три рівні рішень, збереження стороннього й конкретні підстави питань лишилися |
+| Semantic naming, structural fix перед перейменуванням; ubiquitous language і прямі слова | [naming](../skills/restrukt/methods/naming.md) | Один принцип для plan, implement, apply, review і refine; Naming as a Process — один із прийомів, а не межа `refine names` |
+| Design convergence та adversarial review | [склад задач](../skills/restrukt/references/tasks.md), [apply](../skills/restrukt/references/apply.md), [review](../skills/restrukt/references/review.md), [review-code](../skills/restrukt/references/review-code.md) | Зведення має задачу-виконавця; незалежний review охоплює всі попередні ознаки дефекту |
+| Самостійність, дозволи за наслідком, початкові правки й обсяг; формат питань і рішення про зміни поведінки | [контракт](../skills/restrukt/SKILL.md) | Три рівні рішень, збереження стороннього й конкретні підстави питань лишилися; питання та зміни поведінки мають один запис для всіх режимів |
 | Продовження, застарілий стан, архівування старих форматів; окрема тека для кожного обсягу | [контракт](../skills/restrukt/SKILL.md), [continuation](../skills/restrukt/references/continuation.md) | Винесено рідкісні випадки; актуальний код важливіший за стару позначку |
 | Один фокус refine без прихованого розширення | [refine](../skills/restrukt/references/refine.md), [coupling](../skills/restrukt/tools/coupling.md) | Межі збережені; інструмент coupling незмінний |
 | Необов'язкові помічники, неперетин записів, один автор документів, інтеграція | [runtime](../skills/restrukt/references/runtime.md), [worker](../agents/restrukt-worker.md) | Правила діють на поточний виклик; новий самостійний виконавець може успадкувати відповідальність |
@@ -26,8 +26,9 @@
 
 ## Поступове розкриття
 
-- `review` лише маршрутизує: `review plan` читає [review-plan](../skills/restrukt/references/review-plan.md), `review code` — [review-code](../skills/restrukt/references/review-code.md).
-- Перевірку придатності до передачі винесено в [handoff](../skills/restrukt/references/handoff.md): її читають `plan` на кроці 5 і `review plan`, без повного довідника `plan`.
+- `review` — єдиний вхід зі спільними умовами; посилання йдуть лише вниз, без циклів: `review plan` читає [review-plan](../skills/restrukt/references/review-plan.md), `review code` — [review-code](../skills/restrukt/references/review-code.md).
+- Перевірку придатності до передачі винесено в [handoff](../skills/restrukt/references/handoff.md): її читають `plan` на кроці 5, `implement` на кроці 4 і `review plan`, без повного довідника `plan`.
+- Склад задач винесено в [tasks](../skills/restrukt/references/tasks.md): його читають `plan` і `implement` на кроці 4 без довідника іншого режиму.
 - Перевірку з боку викликача винесено в [caller-check](../skills/restrukt/methods/caller-check.md): `review code` не завантажує тактичний дизайн цілком.
 
 ## Навмисно змінений workflow
@@ -37,5 +38,7 @@
 - Готовність задач відділена від актуального приймання цілого.
 - Review змінює робочі документи, а виправлення реалізуються через apply.
 - План передає підстави, контракти, невідоме й свободу рішень новому агенту.
+- Після плану й після останньої задачі черги (`implement` чи `apply`) агент за ризиком вирішує, чи запускати незалежного помічника для `review plan` або `review code`; пропуск записується як самоперевірка з причиною. Одне автоматичне коло виправлень. Правила — в [незалежному перегляді за потребою](../skills/restrukt/references/auto-review.md).
+- `implement` додає роботу із завданням: нова поведінка погоджена джерелом, структура змінюється лише для потреби завдання, питання доменному експерту — до проєктування. Після плану пауза з вибором способу; дрібне однозначне завдання — без паузи. У способах «усе» один виклик виконує чергу, кожна задача проходить цикл `apply`, потребу фінального перегляду визначає ризик. Інші плани не враховуються.
 
 Ці зміни перевіряються новими сценаріями приймання. Збереження принципів оцінюється разом зі старими сценаріями, адаптованими до явних етапів.

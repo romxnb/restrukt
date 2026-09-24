@@ -1,7 +1,7 @@
 {
   "name": "restrukt",
-  "version": "0.19.0",
-  "description": "План перебудови, реалізація по одній задачі й незалежний перегляд цілого зі збереженням поведінки.",
+  "version": "0.20.0",
+  "description": "План перебудови, реалізація завдань зі спеки, виконання по одній задачі й незалежний перегляд цілого.",
   "author": {
     "name": "romxnb"
   },
@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "restrukt",
     "shortDescription": "Зрозумілий код і цілісна архітектура",
-    "longDescription": "Планує цілісну архітектуру та задачі для нових виконавців. Кожен apply реалізує одну задачу; review перевіряє план або зібрану систему. Окремий refine доопрацьовує імена чи зв'язаність.",
+    "longDescription": "Планує цілісну архітектуру та задачі для нових виконавців. implement планує й реалізує завдання з опису, спеки чи issue. Кожен apply реалізує одну задачу; review перевіряє план або зібрану систему. Окремий refine доопрацьовує імена чи зв'язаність.",
     "developerName": "romxnb",
     "category": "Developer tools",
     "capabilities": [
@@ -18,6 +18,7 @@
     ],
     "defaultPrompt": [
       "$restrukt plan для цього застосунку",
+      "$restrukt implement docs/specs/<спека>.md",
       "$restrukt apply",
       "$restrukt review",
       "$restrukt status"
