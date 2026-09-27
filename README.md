@@ -50,7 +50,7 @@
 
 ## Вузькі доопрацювання
 
-`refine names` застосовує [принцип назв](skills/restrukt/methods/naming.md) до всього заданого обсягу; той самий принцип діє в `plan`, `implement`, `apply` і `review`. `refine coupling` застосовує connascence й усуває один доведений недолік. Поведінка зберігається. Без наявного плану робочих документів не створює. Нова архітектура повертається як структурна задача; інші режими й фокуси не запускаються автоматично.
+`refine names` проходить сценарії обсягу з гілками через усі шари, від інтерфейсу до сховища, складає словник понять і дає кожному поняттю одну назву за [принципом назв](skills/restrukt/methods/naming.md); вибір слова предметної області, текст інтерфейсу й контракт на дроті погоджує з користувачем. Той самий принцип діє в `plan`, `implement`, `apply` і `review`. `refine coupling` застосовує connascence й усуває один доведений недолік. Поведінка зберігається. Без наявного плану робочих документів не створює. Нова архітектура повертається як структурна задача; інші режими й фокуси не запускаються автоматично.
 
 ## Пояснення сценарію
 
@@ -85,7 +85,7 @@ codex plugin marketplace add ./
 
 - [Головний контракт](skills/restrukt/SKILL.md); [plan](skills/restrukt/references/plan.md), [implement](skills/restrukt/references/implement.md), [apply](skills/restrukt/references/apply.md), [незалежний перегляд за потребою](skills/restrukt/references/auto-review.md), [review](skills/restrukt/references/review.md) ([план](skills/restrukt/references/review-plan.md), [код](skills/restrukt/references/review-code.md)), [склад задач](skills/restrukt/references/tasks.md), [придатність до передачі](skills/restrukt/references/handoff.md), [критерії архітектури](skills/restrukt/references/architecture.md), [explain](skills/restrukt/references/explain.md).
 - Методики: [історії](skills/restrukt/methods/stories.md), [неявні правила](skills/restrukt/methods/implicit.md), [бізнес-логіка](skills/restrukt/methods/business-logic.md), [проєктування](skills/restrukt/methods/design.md), [власність](skills/restrukt/methods/ownership.md), [зовнішні контракти](skills/restrukt/methods/ports.md), [тактичний дизайн](skills/restrukt/methods/implementation.md), [назви](skills/restrukt/methods/naming.md), [перевірка з боку викликача](skills/restrukt/methods/caller-check.md), [перевірена заміна](skills/restrukt/methods/migration.md), [текст плану](skills/restrukt/methods/writing.md), [пояснення](skills/restrukt/methods/explain.md).
-- [Refine](skills/restrukt/references/refine.md): [імена](skills/restrukt/tools/names.md), [зв'язаність](skills/restrukt/tools/coupling.md).
+- [Refine](skills/restrukt/references/refine.md): [назви](skills/restrukt/tools/names.md), [зв'язаність](skills/restrukt/tools/coupling.md).
 - [Виконання й делегування](skills/restrukt/references/runtime.md); [план](skills/restrukt/templates/plan.md), [журнал](skills/restrukt/templates/log.md).
 - [Сценарії приймання](tests/acceptance.md), [фікстура стану плану](tests/fixtures/plan-state/README.md) для прогонів `claude -p` і [збереження принципів](tests/principles.md) призначені для перевірки плагіна, не для завантаження під час кожної задачі.
 
