@@ -12,6 +12,7 @@
 | Перевірити задум | `/restrukt:review plan` | `$restrukt review plan` |
 | Перевірити зібрану систему | `/restrukt:review` | `$restrukt review` |
 | Доопрацювати конкретний недолік | `/restrukt:refine [names або coupling] [обсяг]` | `$restrukt refine [names або coupling] [обсяг]` |
+| Пояснити сценарій від першої особи | `/restrukt:explain [що] [для кого]` | `$restrukt explain [що] [для кого]` |
 | Подивитися стан | `/restrukt:status` | `$restrukt status` |
 
 Без режиму `$restrukt [обсяг]` створює план. Обсяг — застосунок, тека або модуль; без нього використовується розмова чи поточний проєкт. Кілька рівноправних застосунків потребують уточнення.
@@ -51,6 +52,12 @@
 
 `refine names` застосовує [принцип назв](skills/restrukt/methods/naming.md) до всього заданого обсягу; той самий принцип діє в `plan`, `implement`, `apply` і `review`. `refine coupling` застосовує connascence й усуває один доведений недолік. Поведінка зберігається. Без наявного плану робочих документів не створює. Нова архітектура повертається як структурна задача; інші режими й фокуси не запускаються автоматично.
 
+## Пояснення сценарію
+
+`explain` пише пояснення одного сценарію так, ніби ти сам його проходиш: головний герой — «ти», кожна подія має сенс для тебе. Джерело — код, спека, план чи довідник; історію відновлює та сама методика [історій](skills/restrukt/methods/stories.md), що й у `plan` та `implement`. Результат — `docs/explain/<назва>.md`: заголовок-відповідь, сцена й схема на початку, розділи-питання, у кожному абзаці висновок першим реченням, а докази — в додатку.
+
+Будова дає за одне читання те, що зазвичай дає кілька проходів: лише заголовки, лише жирне чи лише перші речення абзаців окремо переказують сценарій. Перевіряє це `skills/restrukt/scripts/layers.py`. Прийоми й дослідження, на яких вони стоять, — у методиці [пояснення](skills/restrukt/methods/explain.md). Код, тести й плани `explain` не змінює.
+
 ## Результат і витрати
 
 Відповідь показує результат, де читати сценарій, суттєві рішення, фактичні перевірки, залишок і наступний крок; деталі — посиланнями. Незавершене та неперевірене називається прямо.
@@ -76,8 +83,8 @@ codex plugin marketplace add ./
 
 ## Устрій і перевірка
 
-- [Головний контракт](skills/restrukt/SKILL.md); [plan](skills/restrukt/references/plan.md), [implement](skills/restrukt/references/implement.md), [apply](skills/restrukt/references/apply.md), [незалежний перегляд за потребою](skills/restrukt/references/auto-review.md), [review](skills/restrukt/references/review.md) ([план](skills/restrukt/references/review-plan.md), [код](skills/restrukt/references/review-code.md)), [склад задач](skills/restrukt/references/tasks.md), [придатність до передачі](skills/restrukt/references/handoff.md), [критерії архітектури](skills/restrukt/references/architecture.md).
-- Методики: [історії](skills/restrukt/methods/stories.md), [неявні правила](skills/restrukt/methods/implicit.md), [проєктування](skills/restrukt/methods/design.md), [власність](skills/restrukt/methods/ownership.md), [зовнішні контракти](skills/restrukt/methods/ports.md), [тактичний дизайн](skills/restrukt/methods/implementation.md), [назви](skills/restrukt/methods/naming.md), [перевірка з боку викликача](skills/restrukt/methods/caller-check.md), [перевірена заміна](skills/restrukt/methods/migration.md), [текст плану](skills/restrukt/methods/writing.md).
+- [Головний контракт](skills/restrukt/SKILL.md); [plan](skills/restrukt/references/plan.md), [implement](skills/restrukt/references/implement.md), [apply](skills/restrukt/references/apply.md), [незалежний перегляд за потребою](skills/restrukt/references/auto-review.md), [review](skills/restrukt/references/review.md) ([план](skills/restrukt/references/review-plan.md), [код](skills/restrukt/references/review-code.md)), [склад задач](skills/restrukt/references/tasks.md), [придатність до передачі](skills/restrukt/references/handoff.md), [критерії архітектури](skills/restrukt/references/architecture.md), [explain](skills/restrukt/references/explain.md).
+- Методики: [історії](skills/restrukt/methods/stories.md), [неявні правила](skills/restrukt/methods/implicit.md), [проєктування](skills/restrukt/methods/design.md), [власність](skills/restrukt/methods/ownership.md), [зовнішні контракти](skills/restrukt/methods/ports.md), [тактичний дизайн](skills/restrukt/methods/implementation.md), [назви](skills/restrukt/methods/naming.md), [перевірка з боку викликача](skills/restrukt/methods/caller-check.md), [перевірена заміна](skills/restrukt/methods/migration.md), [текст плану](skills/restrukt/methods/writing.md), [пояснення](skills/restrukt/methods/explain.md).
 - [Refine](skills/restrukt/references/refine.md): [імена](skills/restrukt/tools/names.md), [зв'язаність](skills/restrukt/tools/coupling.md).
 - [Виконання й делегування](skills/restrukt/references/runtime.md); [план](skills/restrukt/templates/plan.md), [журнал](skills/restrukt/templates/log.md).
 - [Сценарії приймання](tests/acceptance.md), [фікстура стану плану](tests/fixtures/plan-state/README.md) для прогонів `claude -p` і [збереження принципів](tests/principles.md) призначені для перевірки плагіна, не для завантаження під час кожної задачі.

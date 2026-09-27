@@ -77,6 +77,11 @@ class PackageContractTests(unittest.TestCase):
         errors = checker.check(self.root)
         self.assertTrue(any("SKILL.md: broken link:" in e for e in errors))
 
+    def test_missing_explain_method_breaks_its_reference(self):
+        (self.root / "skills/restrukt/methods/explain.md").unlink()
+        errors = checker.check(self.root)
+        self.assertTrue(any("references/explain.md: broken link:" in e for e in errors))
+
     def test_missing_naming_principle_breaks_all_consumers(self):
         (self.root / "skills/restrukt/methods/naming.md").unlink()
         errors = checker.check(self.root)

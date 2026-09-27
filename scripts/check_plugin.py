@@ -57,7 +57,7 @@ def check(root: Path) -> list[str]:
             "Marketplace source must resolve to this plugin",
         )
 
-    def frontmatter(relative: str, expected_name: str | None = None) -> str:
+    def entry_point(relative: str, expected_name: str | None = None) -> str:
         path = root / relative
         if not path.is_file():
             errors.append(f"Missing entry point: {relative}")
@@ -73,19 +73,19 @@ def check(root: Path) -> list[str]:
             require(fields.get("name") == expected_name, f"{relative}: wrong name")
         return body
 
-    skill = frontmatter("skills/restrukt/SKILL.md", "restrukt")
-    modes = {"plan", "implement", "apply", "review", "refine", "status"}
+    contract = entry_point("skills/restrukt/SKILL.md", "restrukt")
+    modes = {"plan", "implement", "apply", "review", "refine", "explain", "status"}
     command_names = {path.stem for path in (root / "commands").glob("*.md")}
     require(command_names == modes, "Command set must match supported modes")
     for mode in sorted(modes):
         relative = f"commands/{mode}.md"
-        body = frontmatter(relative)
+        body = entry_point(relative)
         require(f"`{mode}`" in body, f"{relative}: wrong mode routing")
         require("${CLAUDE_PLUGIN_ROOT}/skills/restrukt/SKILL.md" in body, f"{relative}: missing skill entry")
         require("$ARGUMENTS" in body, f"{relative}: arguments are not forwarded")
-        require(f"/restrukt:{mode}" in skill, f"Skill does not expose {mode}")
+        require(f"/restrukt:{mode}" in contract, f"Skill does not expose {mode}")
     for path in sorted((root / "agents").glob("*.md")):
-        frontmatter(str(path.relative_to(root)), path.stem)
+        entry_point(str(path.relative_to(root)), path.stem)
 
     # The plan template repeats the contract's state legends so a plan explains itself; copies must not drift.
     # Plan sections may carry a number ("## 6. Задачі"); the name stays the address.
@@ -99,15 +99,15 @@ def check(root: Path) -> list[str]:
 
     template_path = "skills/restrukt/templates/plan.md"
     template = (root / template_path).read_text(encoding="utf-8") if (root / template_path).is_file() else ""
-    for contract_label, template_heading, template_label, states in (
+    for contract_label, template_heading, template_label, legend_name in (
         ("Задача:", "Задачі", "Стани:", "task states"),
         ("«Перевірка цілого»:", "Перевірка цілого", "Стан:", "whole-check states"),
     ):
-        expected = state_legend("skills/restrukt/SKILL.md", skill, "Стан плану", contract_label)
+        expected = state_legend("skills/restrukt/SKILL.md", contract, "Стан плану", contract_label)
         actual = state_legend(template_path, template, template_heading, template_label)
         require(
             not expected or not actual or expected == actual,
-            f"{template_path}: {states} differ from the contract",
+            f"{template_path}: {legend_name} differ from the contract",
         )
 
     # Same-document anchors follow the heading slug rule that Zed and JetBrains previews share.
@@ -169,10 +169,10 @@ if __name__ == "__main__":
         Path(sys.argv[1]).resolve() if len(sys.argv) > 1
         else Path(__file__).resolve().parents[1]
     )
-    failures = check(plugin_root)
-    if failures:
-        for failure in failures:
-            print(f"FAIL: {failure}")
+    errors = check(plugin_root)
+    if errors:
+        for error in errors:
+            print(f"FAIL: {error}")
         sys.exit(1)
     print("PASS: manifests, entry points, command routing, state legends, local links and anchors")
     print("Agent behavior and generated code quality require acceptance runs.")
