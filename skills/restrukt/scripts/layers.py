@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Show the reading layers of an explanation and flag parts that fail on their own.
 
-Layers: headings; bold phrases; first and last sentence of each paragraph.
-Each layer should retell the scenario without the rest of the text.
+Layers: headings, blocks («Коротко» and the others), the summary, bold phrases,
+the first sentence of each section. Headings, «Коротко» and «Підсумок» should retell
+the scenario alone; bold phrases and section openings should read without context.
+Also checks the size of the main text and the «тож…» moral repeated at paragraph ends.
+Whether a first-time reader understands the text is checked by a cold reader, not here.
 """
 
 import re
@@ -18,6 +21,10 @@ BACK_REFERENCES = {
     "it", "this", "that", "they", "them", "so", "therefore",
 }
 TITLE_WORDS = 12
+WORD_LIMIT = 1000
+# A closing moral that restates the paragraph; a few are fine, one per paragraph is a habit.
+MORALS = {"тож", "отже", "так"}
+MORAL_LIMIT = 2
 # Block labels and how many of each a text may hold (0 — as needed).
 BLOCK_LIMITS = {"Коротко": 1, "Визначення": 0, "Увага": 3, "Порада": 3, "Як гадаєш?": 2}
 # A calendar or clock stamp as the opening words is decoration, not a reason to read.
@@ -98,7 +105,7 @@ def main(paths: list[str]) -> int:
                 print(f"  ! жирне починається з відсилання назад: «{first_word(phrase)}»")
                 problems += 1
 
-        print("\n## Перше й останнє речення")
+        print("\n## Вступ і обсяг")
         intro = re.split(r"^> \*\*Коротко\*\*|^```|^## ", body, maxsplit=1, flags=re.M)[0]
         intro_paragraphs = list(paragraphs(intro))
         if len(intro_paragraphs) > 1:
@@ -108,13 +115,29 @@ def main(paths: list[str]) -> int:
         if STAMP.match(opening):
             print("  ! вступ починається з дати чи часу: почни з мети, проблеми чи дії")
             problems += 1
-        for paragraph in paragraphs(body):
-            parts = sentences(paragraph)
-            print(f"- {parts[0]}")
-            if len(parts) > 1:
-                print(f"  … {parts[-1]}")
-            if first_word(parts[0]) in BACK_REFERENCES:
-                print(f"  ! перше речення починається з відсилання назад: «{first_word(parts[0])}»")
+        prose = re.sub(r"^```.*?^```", "", body, flags=re.M | re.S)
+        words = len(re.findall(r"[\w'’]+", prose))
+        print(f"- основний текст: {words} слів")
+        if words > WORD_LIMIT:
+            print(f"  ! більше за {WORD_LIMIT}: обери менше речей або розділи на два пояснення")
+            problems += 1
+        codes = sorted(set(re.findall(r"`([^`\n]+)`", prose)))
+        print(f"- позначень у `коді`: {len(codes)} — {', '.join(codes)}")
+        print("  кожне, якого читач не бачив, має з'явитися після прикладу або зникнути")
+        morals = [p for p in paragraphs(body) if first_word(sentences(p)[-1]) in MORALS and len(sentences(p)) > 1]
+        if len(morals) > MORAL_LIMIT:
+            print(f"  ! {len(morals)} абзаців закінчуються мораллю «тож/отже»: закінчуй новим фактом або дією")
+            problems += 1
+
+        print("\n## Перше речення розділу")
+        for heading, section in zip(re.findall(r"^## (.+)$", body, flags=re.M), re.split(r"^## .+$", body, flags=re.M)[1:]):
+            first = next(iter(paragraphs(section)), "")
+            if not first or heading.startswith(("Чого ", "Підсумок")):
+                continue
+            opening_sentence = sentences(first)[0]
+            print(f"- {heading} → {opening_sentence}")
+            if first_word(opening_sentence) in BACK_REFERENCES:
+                print(f"  ! перше речення розділу починається з відсилання назад: «{first_word(opening_sentence)}»")
                 problems += 1
 
         sections = re.split(r"^## .+$", body, flags=re.M)[1:]
@@ -131,7 +154,7 @@ def main(paths: list[str]) -> int:
             print("! немає додатка «Звідки це відомо»")
             problems += 1
         print()
-    print(f"Зауважень: {problems}. Прочитай кожен шар як окремий текст: скрипт не оцінює зміст.")
+    print(f"Зауважень: {problems}. Скрипт перевіряє форму; чи зрозумілий текст новій людині, перевіряє холодний читач.")
     return 1 if problems else 0
 
 
