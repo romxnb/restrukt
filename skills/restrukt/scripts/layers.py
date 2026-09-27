@@ -4,8 +4,7 @@
 Layers: headings, blocks («Коротко» and the others), the summary, bold phrases,
 the first sentence of each section. Headings, «Коротко» and «Підсумок» should retell
 the scenario alone; bold phrases and section openings should read without context.
-Also checks the size of the main text and the «тож…» moral repeated at paragraph ends.
-Whether a first-time reader understands the text is checked by a cold reader, not here.
+Word and term counts are shown as information, never as problems: the text is not fitted to numbers.
 """
 
 import re
@@ -21,10 +20,6 @@ BACK_REFERENCES = {
     "it", "this", "that", "they", "them", "so", "therefore",
 }
 TITLE_WORDS = 12
-WORD_LIMIT = 1000
-# A closing moral that restates the paragraph; a few are fine, one per paragraph is a habit.
-MORALS = {"тож", "отже", "так"}
-MORAL_LIMIT = 2
 # Block labels and how many of each a text may hold (0 — as needed).
 BLOCK_LIMITS = {"Коротко": 1, "Визначення": 0, "Увага": 3, "Порада": 3, "Як гадаєш?": 2}
 # A calendar or clock stamp as the opening words is decoration, not a reason to read.
@@ -117,17 +112,8 @@ def main(paths: list[str]) -> int:
             problems += 1
         prose = re.sub(r"^```.*?^```", "", body, flags=re.M | re.S)
         words = len(re.findall(r"[\w'’]+", prose))
-        print(f"- основний текст: {words} слів")
-        if words > WORD_LIMIT:
-            print(f"  ! більше за {WORD_LIMIT}: обери менше речей або розділи на два пояснення")
-            problems += 1
         codes = sorted(set(re.findall(r"`([^`\n]+)`", prose)))
-        print(f"- позначень у `коді`: {len(codes)} — {', '.join(codes)}")
-        print("  кожне, якого читач не бачив, має з'явитися після прикладу або зникнути")
-        morals = [p for p in paragraphs(body) if first_word(sentences(p)[-1]) in MORALS and len(sentences(p)) > 1]
-        if len(morals) > MORAL_LIMIT:
-            print(f"  ! {len(morals)} абзаців закінчуються мораллю «тож/отже»: закінчуй новим фактом або дією")
-            problems += 1
+        print(f"- основний текст: {words} слів; позначень у `коді`: {len(codes)}")
 
         print("\n## Перше речення розділу")
         for heading, section in zip(re.findall(r"^## (.+)$", body, flags=re.M), re.split(r"^## .+$", body, flags=re.M)[1:]):
@@ -154,7 +140,7 @@ def main(paths: list[str]) -> int:
             print("! немає додатка «Звідки це відомо»")
             problems += 1
         print()
-    print(f"Зауважень: {problems}. Скрипт перевіряє форму; чи зрозумілий текст новій людині, перевіряє холодний читач.")
+    print(f"Зауважень: {problems}. Скрипт перевіряє лише будову; числа — довідка, не ціль.")
     return 1 if problems else 0
 
 
