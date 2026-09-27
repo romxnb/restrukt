@@ -18,6 +18,14 @@ BACK_REFERENCES = {
     "it", "this", "that", "they", "them", "so", "therefore",
 }
 TITLE_WORDS = 12
+# Block labels and how many of each a text may hold (0 — as needed).
+BLOCK_LIMITS = {"Коротко": 1, "Визначення": 0, "Увага": 3, "Порада": 3, "Як гадаєш?": 2}
+# A calendar or clock stamp as the opening words is decoration, not a reason to read.
+STAMP = re.compile(
+    r"^(понеділ|вівтор|серед|четвер|п['’]ятниц|субот|неділ|ранок|вечір|ніч|опівдні|"
+    r"monday|tuesday|wednesday|thursday|friday|saturday|sunday|morning|evening|\d{1,2}[:.]\d{2})",
+    flags=re.I,
+)
 
 
 def body_of(text: str) -> str:
@@ -62,6 +70,26 @@ def main(paths: list[str]) -> int:
             print(f"  ! заголовок довший за {TITLE_WORDS} слів: подробиці — у вступ")
             problems += 1
 
+        print("\n## Блоки")
+        blocks = re.findall(r"^> \*\*(.+?)\*\*\s*·?\s*(.*)$", body, flags=re.M)
+        counts: dict[str, int] = {}
+        for label, rest in blocks:
+            print(f"- {label} · {rest}")
+            counts[label] = counts.get(label, 0) + 1
+            if label not in BLOCK_LIMITS:
+                print(f"  ! невідома мітка «{label}»: лише {', '.join(BLOCK_LIMITS)}")
+                problems += 1
+        for label, limit in BLOCK_LIMITS.items():
+            if limit and counts.get(label, 0) > limit:
+                print(f"  ! «{label}» — {counts[label]}, більше за {limit}")
+                problems += 1
+        if not counts.get("Коротко"):
+            print("  ! немає блоку «Коротко» після вступу")
+            problems += 1
+        if not re.search(r"^## Підсумок", body, flags=re.M):
+            print("  ! немає розділу «Підсумок»")
+            problems += 1
+
         print("\n## Жирне")
         bold = re.findall(r"\*\*(.+?)\*\*", body)
         for phrase in bold:
@@ -71,6 +99,15 @@ def main(paths: list[str]) -> int:
                 problems += 1
 
         print("\n## Перше й останнє речення")
+        intro = re.split(r"^> \*\*Коротко\*\*|^```|^## ", body, maxsplit=1, flags=re.M)[0]
+        intro_paragraphs = list(paragraphs(intro))
+        if len(intro_paragraphs) > 1:
+            print(f"  ! вступ — {len(intro_paragraphs)} абзаци: сцена — один абзац, суть — у блоці «Коротко»")
+            problems += 1
+        opening = next(iter(paragraphs(body)), "")
+        if STAMP.match(opening):
+            print("  ! вступ починається з дати чи часу: почни з мети, проблеми чи дії")
+            problems += 1
         for paragraph in paragraphs(body):
             parts = sentences(paragraph)
             print(f"- {parts[0]}")
@@ -82,7 +119,7 @@ def main(paths: list[str]) -> int:
 
         sections = re.split(r"^## .+$", body, flags=re.M)[1:]
         for heading, section in zip(re.findall(r"^## (.+)$", body, flags=re.M), sections):
-            if heading.startswith("Чого "):
+            if heading.startswith(("Чого ", "Підсумок")):
                 continue  # open questions: «### Q1 · …» and a paragraph, no bold
             if "**" not in section and list(paragraphs(section)):
                 print(f"! розділ без жирного: «{heading}»")
