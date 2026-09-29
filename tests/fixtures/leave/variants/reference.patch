@@ -710,10 +710,10 @@ index 0000000..091286e
 +}
 diff --git a/backend/tests/Api/LeaveRequestTest.php b/backend/tests/Api/LeaveRequestTest.php
 new file mode 100644
-index 0000000..2c755b6
+index 0000000..6c3c378
 --- /dev/null
 +++ b/backend/tests/Api/LeaveRequestTest.php
-@@ -0,0 +1,123 @@
+@@ -0,0 +1,185 @@
 +<?php
 +
 +namespace App\Tests\Api;
@@ -748,6 +748,68 @@ index 0000000..2c755b6
 +        self::assertSame(4, $request['workingDays']);
 +        self::assertSame('pending', $request['status']);
 +        self::assertEmailCount(1);
++    }
++
++    /**
++     * @return iterable<string, array{array<string, string>, string}>
++     */
++    public static function refusedSubmissions(): iterable
++    {
++        yield 'date in another format' => [['startDate' => '09.03.2026', 'endDate' => '2026-03-10'], 'Вкажіть дати у форматі РРРР-ММ-ДД.'];
++        yield 'start after end' => [['startDate' => '2026-03-10', 'endDate' => '2026-03-09'], 'Дата початку пізніша за дату завершення.'];
++        yield 'two years' => [['startDate' => '2026-12-28', 'endDate' => '2027-01-04'], 'Заява не може охоплювати два роки.'];
++        yield 'weekend only' => [['startDate' => '2026-03-07', 'endDate' => '2026-03-08'], 'У вибраному періоді немає робочих днів.'];
++        yield 'long comment' => [['startDate' => '2026-03-09', 'endDate' => '2026-03-10', 'comment' => str_repeat('я', 501)], 'Коментар не довший за 500 символів.'];
++    }
++
++    /**
++     * @param array<string, string> $submission
++     */
++    #[\PHPUnit\Framework\Attributes\DataProvider('refusedSubmissions')]
++    public function testBrokenRuleIsNamed(array $submission, string $message): void
++    {
++        $error = $this->requestAs($this->taras, 'POST', '/api/leave-requests', $submission);
++
++        self::assertResponseStatusCodeSame(422);
++        self::assertSame($message, $error['error']);
++    }
++
++    public function testCancelledRequestFreesItsDays(): void
++    {
++        $request = $this->requestAs($this->taras, 'POST', '/api/leave-requests', ['startDate' => '2026-03-09', 'endDate' => '2026-03-10']);
++
++        $cancelled = $this->requestAs($this->taras, 'POST', "/api/leave-requests/{$request['id']}/cancel");
++
++        self::assertSame('cancelled', $cancelled['status']);
++        self::assertSame(5, $this->requestAs($this->taras, 'GET', '/api/leave-requests')['balance']['remaining']);
++    }
++
++    public function testColleaguesRequestIsNotFound(): void
++    {
++        $request = $this->requestAs($this->olena, 'POST', '/api/leave-requests', ['startDate' => '2026-03-09', 'endDate' => '2026-03-10']);
++
++        $error = $this->requestAs($this->taras, 'POST', "/api/leave-requests/{$request['id']}/cancel");
++
++        self::assertResponseStatusCodeSame(404);
++        self::assertSame('Заяву не знайдено.', $error['error']);
++    }
++
++    public function testRejectionNeedsReason(): void
++    {
++        $request = $this->requestAs($this->taras, 'POST', '/api/leave-requests', ['startDate' => '2026-03-09', 'endDate' => '2026-03-10']);
++
++        $error = $this->requestAs($this->olena, 'POST', "/api/team/leave-requests/{$request['id']}/reject", ['reason' => ' ']);
++
++        self::assertSame('Вкажіть причину відмови.', $error['error']);
++    }
++
++    public function testManagerSeesPendingRequestsOfTeam(): void
++    {
++        $this->requestAs($this->taras, 'POST', '/api/leave-requests', ['startDate' => '2026-03-09', 'endDate' => '2026-03-10']);
++
++        $pending = $this->requestAs($this->olena, 'GET', '/api/team/leave-requests');
++
++        self::assertSame(['Тарас Мельник'], array_column(array_column($pending, 'employee'), 'name'));
 +    }
 +
 +    public function testRequestBeyondRemainingDaysIsRefused(): void
@@ -995,6 +1057,76 @@ index 799eb7a..0c37c36 100644
 +export function formatPeriod(startDate: string, endDate: string): string {
 +  return `${formatDate(startDate)} – ${formatDate(endDate)}`
 +}
+diff --git a/frontend/src/pages/LeavePage.test.ts b/frontend/src/pages/LeavePage.test.ts
+new file mode 100644
+index 0000000..d1b802c
+--- /dev/null
++++ b/frontend/src/pages/LeavePage.test.ts
+@@ -0,0 +1,64 @@
++import { flushPromises, mount } from '@vue/test-utils'
++import { beforeEach, describe, expect, it, vi } from 'vitest'
++import { ApiError } from '@/api/client'
++import * as leave from '@/api/leave'
++import LeavePage from './LeavePage.vue'
++
++const pendingRequest: leave.LeaveRequest = {
++  id: 7,
++  startDate: '2026-10-05',
++  endDate: '2026-10-09',
++  workingDays: 5,
++  status: 'pending',
++  comment: null,
++  rejectionReason: null,
++  cancellable: true,
++}
++
++function myLeave(requests: leave.LeaveRequest[]): leave.MyLeave {
++  const pending = requests.filter((request) => request.status === 'pending').length * 5
++  return { year: 2026, balance: { allowance: 24, approved: 0, pending, remaining: 24 - pending }, requests }
++}
++
++describe('LeavePage', () => {
++  beforeEach(() => {
++    vi.restoreAllMocks()
++  })
++
++  it('shows the balance and the requests of the year', async () => {
++    vi.spyOn(leave, 'fetchMyLeave').mockResolvedValue(myLeave([pendingRequest]))
++    const page = mount(LeavePage)
++    await flushPromises()
++
++    expect(page.text()).toContain('Залишок: 19')
++    expect(page.text()).toContain('05.10.2026 – 09.10.2026')
++    expect(page.text()).toContain('На розгляді')
++  })
++
++  it('reloads the balance after cancelling a request', async () => {
++    const fetch = vi.spyOn(leave, 'fetchMyLeave').mockResolvedValueOnce(myLeave([pendingRequest]))
++    fetch.mockResolvedValueOnce(myLeave([{ ...pendingRequest, status: 'cancelled', cancellable: false }]))
++    vi.spyOn(leave, 'cancelLeaveRequest').mockResolvedValue({ ...pendingRequest, status: 'cancelled' })
++    const page = mount(LeavePage)
++    await flushPromises()
++
++    await page.get('button[type="button"]').trigger('click')
++    await flushPromises()
++
++    expect(leave.cancelLeaveRequest).toHaveBeenCalledWith(7)
++    expect(page.text()).toContain('Скасовано')
++    expect(page.text()).toContain('Залишок: 24')
++  })
++
++  it('shows why a request was refused', async () => {
++    vi.spyOn(leave, 'fetchMyLeave').mockResolvedValue(myLeave([]))
++    vi.spyOn(leave, 'submitLeaveRequest').mockRejectedValue(new ApiError('Період перетинається з іншою заявою.', 422))
++    const page = mount(LeavePage)
++    await flushPromises()
++
++    await page.get('form').trigger('submit')
++    await flushPromises()
++
++    expect(page.get('[role="alert"]').text()).toBe('Період перетинається з іншою заявою.')
++  })
++})
 diff --git a/frontend/src/pages/LeavePage.vue b/frontend/src/pages/LeavePage.vue
 new file mode 100644
 index 0000000..68f7849
@@ -1080,6 +1212,47 @@ index 0000000..68f7849
 +  padding: 0;
 +}
 +</style>
+diff --git a/frontend/src/pages/TeamLeavePage.test.ts b/frontend/src/pages/TeamLeavePage.test.ts
+new file mode 100644
+index 0000000..879b39b
+--- /dev/null
++++ b/frontend/src/pages/TeamLeavePage.test.ts
+@@ -0,0 +1,35 @@
++import { flushPromises, mount } from '@vue/test-utils'
++import { beforeEach, describe, expect, it, vi } from 'vitest'
++import * as leave from '@/api/leave'
++import TeamLeavePage from './TeamLeavePage.vue'
++
++const tarasRequest: leave.TeamLeaveRequest = {
++  id: 8,
++  employee: { id: 3, name: 'Тарас Мельник' },
++  startDate: '2026-11-02',
++  endDate: '2026-11-04',
++  workingDays: 3,
++  comment: null,
++}
++
++describe('TeamLeavePage', () => {
++  beforeEach(() => {
++    vi.restoreAllMocks()
++  })
++
++  it('rejects a request with a reason and drops it from the list', async () => {
++    vi.spyOn(leave, 'fetchTeamLeaveRequests').mockResolvedValueOnce([tarasRequest]).mockResolvedValueOnce([])
++    vi.spyOn(leave, 'rejectLeaveRequest').mockResolvedValue({})
++    const page = mount(TeamLeavePage)
++    await flushPromises()
++
++    const reject = page.findAll('button').find((button) => button.text() === 'Відхилити')
++    await reject!.trigger('click')
++    await page.get('input').setValue('Реліз')
++    await page.get('form').trigger('submit')
++    await flushPromises()
++
++    expect(leave.rejectLeaveRequest).toHaveBeenCalledWith(8, 'Реліз')
++    expect(page.text()).toContain('Заяв на розгляді немає.')
++  })
++})
 diff --git a/frontend/src/pages/TeamLeavePage.vue b/frontend/src/pages/TeamLeavePage.vue
 new file mode 100644
 index 0000000..409fbb9
