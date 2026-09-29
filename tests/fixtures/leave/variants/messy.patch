@@ -1,0 +1,1710 @@
+diff --git a/backend/migrations/Version20260929021010.php b/backend/migrations/Version20260929021010.php
+new file mode 100644
+index 0000000..6ad4a43
+--- /dev/null
++++ b/backend/migrations/Version20260929021010.php
+@@ -0,0 +1,32 @@
++<?php
++
++declare(strict_types=1);
++
++namespace DoctrineMigrations;
++
++use Doctrine\DBAL\Schema\Schema;
++use Doctrine\Migrations\AbstractMigration;
++
++/**
++ * Auto-generated Migration: Please modify to your needs!
++ */
++final class Version20260929021010 extends AbstractMigration
++{
++    public function getDescription(): string
++    {
++        return '';
++    }
++
++    public function up(Schema $schema): void
++    {
++        // this up() migration is auto-generated, please modify it to your needs
++        $this->addSql('CREATE TABLE leave (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, start_date DATE NOT NULL, end_date DATE NOT NULL, days INTEGER NOT NULL, status VARCHAR(20) NOT NULL, comment VARCHAR(500) DEFAULT NULL, rejection_reason VARCHAR(255) DEFAULT NULL, created_at DATETIME NOT NULL, employee_id INTEGER NOT NULL, CONSTRAINT FK_9BB080D08C03F15C FOREIGN KEY (employee_id) REFERENCES employee (id) NOT DEFERRABLE INITIALLY IMMEDIATE)');
++        $this->addSql('CREATE INDEX IDX_9BB080D08C03F15C ON leave (employee_id)');
++    }
++
++    public function down(Schema $schema): void
++    {
++        // this down() migration is auto-generated, please modify it to your needs
++        $this->addSql('DROP TABLE leave');
++    }
++}
+diff --git a/backend/src/Controller/LeaveController.php b/backend/src/Controller/LeaveController.php
+new file mode 100644
+index 0000000..0182e2a
+--- /dev/null
++++ b/backend/src/Controller/LeaveController.php
+@@ -0,0 +1,392 @@
++<?php
++
++namespace App\Controller;
++
++use App\Entity\Employee;
++use App\Entity\Leave;
++use App\Factory\LeaveFactory;
++use App\Mapper\LeaveRequestMapper;
++use App\Notification\NotificationManager;
++use App\Repository\LeaveRepository;
++use App\Repository\PublicHolidayRepository;
++use App\Service\LeaveServiceInterface;
++use App\Service\LeaveStatusResolver;
++use Doctrine\ORM\EntityManagerInterface;
++use Psr\Clock\ClockInterface;
++use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
++use Symfony\Component\HttpFoundation\JsonResponse;
++use Symfony\Component\HttpFoundation\Request;
++use Symfony\Component\Routing\Attribute\Route;
++
++#[Route('/api')]
++class LeaveController extends AbstractController
++{
++    public function __construct(
++        private EntityManagerInterface $em,
++        private LeaveServiceInterface $leaveService,
++        private LeaveRepository $leaveRepository,
++        private PublicHolidayRepository $holidayRepository,
++        private ClockInterface $clock,
++        private NotificationManager $notificationManager,
++        private LeaveRequestMapper $mapper,
++        private LeaveFactory $leaveFactory,
++    ) {
++    }
++
++    /**
++     * My leave requests for year + balance.
++     */
++    #[Route('/leave-requests', methods: ['GET'])]
++    public function list(Request $request): JsonResponse
++    {
++        /** @var Employee $user */
++        $user = $this->getUser();
++
++        // get year from query, current year by default
++        $year = $request->query->get('year');
++        if (!$year) {
++            $year = $this->clock->now()->format('Y');
++        }
++        $year = (int) $year;
++
++        $leaves = $this->leaveService->getVacations($user, $year);
++
++        $approved = 0;
++        $pending = 0;
++        $requests = [];
++        foreach ($leaves as $leave) {
++            if ('approved' == $leave->getStatus()) {
++                $approved = $approved + $leave->getDays();
++            } elseif ('pending' == $leave->getStatus()) {
++                $pending = $pending + $leave->getDays();
++            }
++            $requests[] = $this->leaveToArray($leave);
++        }
++
++        return new JsonResponse([
++            'year' => $year,
++            'balance' => [
++                'allowance' => $user->getAnnualLeaveDays(),
++                'approved' => $approved,
++                'pending' => $pending,
++                'remaining' => $user->getAnnualLeaveDays() - $approved - $pending,
++            ],
++            'requests' => $requests,
++        ]);
++    }
++
++    /**
++     * Submit new leave request.
++     */
++    #[Route('/leave-requests', methods: ['POST'])]
++    public function create(Request $request): JsonResponse
++    {
++        /** @var Employee $user */
++        $user = $this->getUser();
++
++        $data = json_decode($request->getContent(), true);
++        if (!is_array($data)) {
++            $data = [];
++        }
++
++        $startDate = $data['startDate'] ?? null;
++        $endDate = $data['endDate'] ?? null;
++
++        // validate dates
++        if (!is_string($startDate) || !preg_match('/^\d{4}-\d{2}-\d{2}$/D', $startDate)) {
++            return new JsonResponse(['error' => 'Вкажіть дати у форматі РРРР-ММ-ДД.'], 422);
++        }
++        if (!is_string($endDate) || !preg_match('/^\d{4}-\d{2}-\d{2}$/D', $endDate)) {
++            return new JsonResponse(['error' => 'Вкажіть дати у форматі РРРР-ММ-ДД.'], 422);
++        }
++        $s = explode('-', $startDate);
++        if (!checkdate((int) $s[1], (int) $s[2], (int) $s[0])) {
++            return new JsonResponse(['error' => 'Вкажіть дати у форматі РРРР-ММ-ДД.'], 422);
++        }
++        $e = explode('-', $endDate);
++        if (!checkdate((int) $e[1], (int) $e[2], (int) $e[0])) {
++            return new JsonResponse(['error' => 'Вкажіть дати у форматі РРРР-ММ-ДД.'], 422);
++        }
++
++        if ($startDate > $endDate) {
++            return new JsonResponse(['error' => 'Дата початку пізніша за дату завершення.'], 422);
++        }
++
++        // get today
++        $today = $this->clock->now()->format('Y-m-d');
++        if ($startDate < $today) {
++            return new JsonResponse(['error' => 'Не можна подати заяву на минулу дату.'], 422);
++        }
++
++        if (substr($startDate, 0, 4) != substr($endDate, 0, 4)) {
++            return new JsonResponse(['error' => 'Заява не може охоплювати два роки.'], 422);
++        }
++
++        $days = $this->countDays(new \DateTimeImmutable($startDate), new \DateTimeImmutable($endDate));
++        if (0 == $days) {
++            return new JsonResponse(['error' => 'У вибраному періоді немає робочих днів.'], 422);
++        }
++
++        if (isset($data['comment']) && mb_strlen($data['comment']) > 500) {
++            return new JsonResponse(['error' => 'Коментар не довший за 500 символів.'], 422);
++        }
++
++        // check if period overlaps with other requests
++        $myLeaves = $this->leaveRepository->findBy(['employee' => $user]);
++        foreach ($myLeaves as $l) {
++            if ('cancelled' == $l->getStatus() || 'rejected' == $l->getStatus()) {
++                continue;
++            }
++            if ($l->getStartDate()->format('Y-m-d') <= $endDate && $l->getEndDate()->format('Y-m-d') >= $startDate) {
++                return new JsonResponse(['error' => 'Період перетинається з іншою заявою.'], 422);
++            }
++        }
++
++        $balance = $this->fetchBalance($user, (int) substr($startDate, 0, 4));
++        if ($days > $balance) {
++            return new JsonResponse(['error' => 'Недостатньо днів відпустки: залишилось '.$balance.'.'], 422);
++        }
++
++        // $leave = new Leave();
++        // $leave->setEmployee($user);
++        // $leave->setStartDate(new \DateTimeImmutable($startDate));
++        // $leave->setEndDate(new \DateTimeImmutable($endDate));
++        // $leave->setDays($days);
++        // $leave->setComment($data['comment'] ?? null);
++        // $leave->setStatus('pending');
++        // $this->em->persist($leave);
++        // $this->em->flush();
++
++        try {
++            $dto = $this->mapper->map($data);
++            $leave = $this->leaveFactory->create($dto, $user);
++            $leave->setStatus(LeaveStatusResolver::resolve($user));
++            $this->leaveService->save($leave);
++
++            // send email to manager
++            if ('pending' == $leave->getStatus()) {
++                $this->notificationManager->notify('new_request', $leave);
++            }
++        } catch (\Exception $e) {
++            return new JsonResponse(['error' => $e->getMessage()], 422);
++        }
++
++        return new JsonResponse($this->leaveToArray($leave), 201);
++    }
++
++    /**
++     * Cancel my leave request.
++     */
++    #[Route('/leave-requests/{id}/cancel', methods: ['POST'], requirements: ['id' => '\d+'])]
++    public function cancel(int $id): JsonResponse
++    {
++        /** @var Employee $user */
++        $user = $this->getUser();
++
++        $leave = $this->leaveService->getLeave($id);
++        // check that leave exists and belongs to user
++        if (!$leave || $leave->getEmployee()->getId() != $user->getId()) {
++            return new JsonResponse(['error' => 'Заяву не знайдено.'], 404);
++        }
++
++        $today = $this->clock->now()->format('Y-m-d');
++        if (('pending' != $leave->getStatus() && 'approved' != $leave->getStatus()) || $leave->getStartDate()->format('Y-m-d') <= $today) {
++            return new JsonResponse(['error' => 'Скасувати можна лише заяву, що ще не почалася.'], 422);
++        }
++
++        // set status to cancelled
++        $leave->setStatus('cancelled');
++        $this->em->flush();
++
++        return new JsonResponse($this->leaveToArray($leave));
++    }
++
++    /**
++     * Pending requests of manager's team.
++     */
++    #[Route('/team/leave-requests', methods: ['GET'])]
++    public function teamRequests(): JsonResponse
++    {
++        /** @var Employee $user */
++        $user = $this->getUser();
++
++        // only manager can see team requests
++        if (!$user->isManager()) {
++            return new JsonResponse(['error' => 'Доступно лише керівнику команди.'], 403);
++        }
++
++        $result = [];
++        foreach ($this->leaveService->getTeamRequests($user->getTeam()) as $holidayRequest) {
++            $result[] = [
++                'id' => $holidayRequest->getId(),
++                'employee' => [
++                    'id' => $holidayRequest->getEmployee()->getId(),
++                    'name' => $holidayRequest->getEmployee()->getName(),
++                ],
++                'startDate' => $holidayRequest->getStartDate()->format('Y-m-d'),
++                'endDate' => $holidayRequest->getEndDate()->format('Y-m-d'),
++                'workingDays' => $holidayRequest->getDays(),
++                'comment' => $holidayRequest->getComment(),
++            ];
++        }
++
++        return $this->json($result);
++    }
++
++    #[Route('/team/leave-requests/{id}/approve', methods: ['POST'], requirements: ['id' => '\d+'])]
++    public function approve(int $id): JsonResponse
++    {
++        /** @var Employee $user */
++        $user = $this->getUser();
++
++        // only manager can approve
++        if (!$user->isManager()) {
++            return new JsonResponse(['error' => 'Доступно лише керівнику команди.'], 403);
++        }
++
++        $leave = $this->leaveRepository->find($id);
++        if (!$leave) {
++            return new JsonResponse(['error' => 'Заяву не знайдено.'], 404);
++        }
++
++        // request must be from manager's team
++        if ($leave->getEmployee()->getTeam()->getId() != $user->getTeam()->getId()) {
++            return new JsonResponse(['error' => 'Доступно лише керівнику команди.'], 403);
++        }
++
++        if ('pending' != $leave->getStatus()) {
++            return new JsonResponse(['error' => 'Заяву вже розглянуто.'], 422);
++        }
++
++        $leave->setStatus('approved');
++        $this->em->flush();
++
++        // notify employee
++        $this->notificationManager->notify('approved', $leave);
++
++        return new JsonResponse([
++            'id' => $leave->getId(),
++            'status' => $leave->getStatus(),
++            'rejectionReason' => $leave->getRejectionReason(),
++        ]);
++    }
++
++    #[Route('/team/leave-requests/{id}/reject', methods: ['POST'], requirements: ['id' => '\d+'])]
++    public function reject(int $id, Request $request): JsonResponse
++    {
++        /** @var Employee $user */
++        $user = $this->getUser();
++
++        // only manager can reject
++        if (!$user->isManager()) {
++            return new JsonResponse(['error' => 'Доступно лише керівнику команди.'], 403);
++        }
++
++        $vacation = $this->leaveRepository->find($id);
++        if (!$vacation) {
++            return new JsonResponse(['error' => 'Заяву не знайдено.'], 404);
++        }
++
++        // request must be from manager's team
++        if ($vacation->getEmployee()->getTeam()->getId() != $user->getTeam()->getId()) {
++            return new JsonResponse(['error' => 'Доступно лише керівнику команди.'], 403);
++        }
++
++        if ('pending' != $vacation->getStatus()) {
++            return new JsonResponse(['error' => 'Заяву вже розглянуто.'], 422);
++        }
++
++        $data = json_decode($request->getContent(), true);
++        $reason = isset($data['reason']) ? trim($data['reason']) : '';
++        if ('' == $reason) {
++            return new JsonResponse(['error' => 'Вкажіть причину відмови.'], 422);
++        }
++
++        $vacation->setStatus('rejected');
++        $vacation->setRejectionReason($reason);
++        $this->em->flush();
++
++        // notify employee
++        $this->notificationManager->notify('rejected', $vacation, ['reason' => $reason]);
++
++        return new JsonResponse([
++            'id' => $vacation->getId(),
++            'status' => $vacation->getStatus(),
++            'rejectionReason' => $vacation->getRejectionReason(),
++        ]);
++    }
++
++    private function leaveToArray(Leave $leave): array
++    {
++        $today = $this->clock->now()->format('Y-m-d');
++
++        // leave can be cancelled only before it starts
++        $cancellable = false;
++        if (('pending' == $leave->getStatus() || 'approved' == $leave->getStatus()) && $leave->getStartDate()->format('Y-m-d') > $today) {
++            $cancellable = true;
++        }
++
++        return [
++            'id' => $leave->getId(),
++            'startDate' => $leave->getStartDate()->format('Y-m-d'),
++            'endDate' => $leave->getEndDate()->format('Y-m-d'),
++            'workingDays' => $leave->getDays(),
++            'status' => $leave->getStatus(),
++            'comment' => $leave->getComment(),
++            'rejectionReason' => $leave->getRejectionReason(),
++            'cancellable' => $cancellable,
++        ];
++    }
++
++    /**
++     * Count working days in period (without weekends and holidays).
++     */
++    private function countDays(\DateTimeImmutable $start, \DateTimeImmutable $end): int
++    {
++        $holidays = $this->holidayRepository->findBetween($start, $end);
++
++        $days = 0;
++        $period = new \DatePeriod($start, new \DateInterval('P1D'), $end->modify('+1 day'));
++        foreach ($period as $day) {
++            // skip weekends
++            if ($day->format('N') >= 6) {
++                continue;
++            }
++
++            $isHoliday = false;
++            foreach ($holidays as $holiday) {
++                if ($holiday->getDate()->format('Y-m-d') == $day->format('Y-m-d')) {
++                    $isHoliday = true;
++                    break;
++                }
++            }
++
++            if (!$isHoliday) {
++                ++$days;
++            }
++        }
++
++        return $days;
++    }
++
++    /**
++     * Remaining days of employee in year.
++     */
++    private function fetchBalance(Employee $employee, int $year): int
++    {
++        $sql = "SELECT SUM(days) FROM leave WHERE employee_id = :employee AND status IN ('pending', 'approved') AND strftime('%Y', start_date) = :year";
++        $used = $this->em->getConnection()->fetchOne($sql, [
++            'employee' => $employee->getId(),
++            'year' => (string) $year,
++        ]);
++
++        return $employee->getAnnualLeaveDays() - (int) $used;
++    }
++
++    private function calcDays(string $from, string $to): int
++    {
++        $diff = (new \DateTimeImmutable($from))->diff(new \DateTimeImmutable($to));
++
++        return $diff->days + 1;
++    }
++}
+diff --git a/backend/src/Dto/LeaveRequestDTO.php b/backend/src/Dto/LeaveRequestDTO.php
+new file mode 100644
+index 0000000..0b795e0
+--- /dev/null
++++ b/backend/src/Dto/LeaveRequestDTO.php
+@@ -0,0 +1,12 @@
++<?php
++
++namespace App\Dto;
++
++class LeaveRequestDTO
++{
++    public ?string $startDate = null;
++
++    public ?string $endDate = null;
++
++    public ?string $comment = null;
++}
+diff --git a/backend/src/Entity/Leave.php b/backend/src/Entity/Leave.php
+new file mode 100644
+index 0000000..653c406
+--- /dev/null
++++ b/backend/src/Entity/Leave.php
+@@ -0,0 +1,152 @@
++<?php
++
++namespace App\Entity;
++
++use App\Repository\LeaveRepository;
++use Doctrine\DBAL\Types\Types;
++use Doctrine\ORM\Mapping as ORM;
++
++#[ORM\Entity(repositoryClass: LeaveRepository::class)]
++#[ORM\Table(name: 'leave')]
++class Leave
++{
++    #[ORM\Id]
++    #[ORM\GeneratedValue]
++    #[ORM\Column]
++    private ?int $id = null;
++
++    #[ORM\ManyToOne]
++    #[ORM\JoinColumn(nullable: false)]
++    private ?Employee $employee = null;
++
++    #[ORM\Column(type: Types::DATE_IMMUTABLE)]
++    private ?\DateTimeImmutable $startDate = null;
++
++    #[ORM\Column(type: Types::DATE_IMMUTABLE)]
++    private ?\DateTimeImmutable $endDate = null;
++
++    // working days
++    #[ORM\Column]
++    private ?int $days = null;
++
++    // pending / approved / rejected / cancelled
++    #[ORM\Column(length: 20)]
++    private ?string $status = null;
++
++    #[ORM\Column(length: 500, nullable: true)]
++    private ?string $comment = null;
++
++    #[ORM\Column(length: 255, nullable: true)]
++    private ?string $rejectionReason = null;
++
++    #[ORM\Column]
++    private ?\DateTimeImmutable $createdAt = null;
++
++    public function getId(): ?int
++    {
++        return $this->id;
++    }
++
++    public function setId(?int $id): static
++    {
++        $this->id = $id;
++
++        return $this;
++    }
++
++    public function getEmployee(): ?Employee
++    {
++        return $this->employee;
++    }
++
++    public function setEmployee(?Employee $employee): static
++    {
++        $this->employee = $employee;
++
++        return $this;
++    }
++
++    public function getStartDate(): ?\DateTimeImmutable
++    {
++        return $this->startDate;
++    }
++
++    public function setStartDate(\DateTimeImmutable $startDate): static
++    {
++        $this->startDate = $startDate;
++
++        return $this;
++    }
++
++    public function getEndDate(): ?\DateTimeImmutable
++    {
++        return $this->endDate;
++    }
++
++    public function setEndDate(\DateTimeImmutable $endDate): static
++    {
++        $this->endDate = $endDate;
++
++        return $this;
++    }
++
++    public function getDays(): ?int
++    {
++        return $this->days;
++    }
++
++    public function setDays(int $days): static
++    {
++        $this->days = $days;
++
++        return $this;
++    }
++
++    public function getStatus(): ?string
++    {
++        return $this->status;
++    }
++
++    public function setStatus(string $status): static
++    {
++        $this->status = $status;
++
++        return $this;
++    }
++
++    public function getComment(): ?string
++    {
++        return $this->comment;
++    }
++
++    public function setComment(?string $comment): static
++    {
++        $this->comment = $comment;
++
++        return $this;
++    }
++
++    public function getRejectionReason(): ?string
++    {
++        return $this->rejectionReason;
++    }
++
++    public function setRejectionReason(?string $rejectionReason): static
++    {
++        $this->rejectionReason = $rejectionReason;
++
++        return $this;
++    }
++
++    public function getCreatedAt(): ?\DateTimeImmutable
++    {
++        return $this->createdAt;
++    }
++
++    public function setCreatedAt(\DateTimeImmutable $createdAt): static
++    {
++        $this->createdAt = $createdAt;
++
++        return $this;
++    }
++}
+diff --git a/backend/src/Factory/LeaveFactory.php b/backend/src/Factory/LeaveFactory.php
+new file mode 100644
+index 0000000..0ae713b
+--- /dev/null
++++ b/backend/src/Factory/LeaveFactory.php
+@@ -0,0 +1,45 @@
++<?php
++
++namespace App\Factory;
++
++use App\Dto\LeaveRequestDTO;
++use App\Entity\Employee;
++use App\Entity\Leave;
++use App\Helper\DateHelper;
++use App\Repository\PublicHolidayRepository;
++use Psr\Clock\ClockInterface;
++
++class LeaveFactory
++{
++    public function __construct(
++        private PublicHolidayRepository $publicHolidayRepository,
++        private ClockInterface $clock,
++    ) {
++    }
++
++    /**
++     * Creates new leave from DTO.
++     */
++    public function create(LeaveRequestDTO $dto, Employee $employee): Leave
++    {
++        $start = new \DateTimeImmutable((string) $dto->startDate);
++        $end = new \DateTimeImmutable((string) $dto->endDate);
++
++        $holidays = [];
++        foreach ($this->publicHolidayRepository->findBetween($start, $end) as $holiday) {
++            $holidays[] = $holiday->getDate()->format('Y-m-d');
++        }
++
++        $leave = new Leave();
++        $leave->setEmployee($employee);
++        $leave->setStartDate($start);
++        $leave->setEndDate($end);
++        $leave->setDays(DateHelper::calc($start, $end, $holidays));
++        $leave->setComment($dto->comment);
++        $leave->setStatus('pending');
++        $leave->setRejectionReason(null);
++        $leave->setCreatedAt($this->clock->now());
++
++        return $leave;
++    }
++}
+diff --git a/backend/src/Helper/DateHelper.php b/backend/src/Helper/DateHelper.php
+new file mode 100644
+index 0000000..37c7f87
+--- /dev/null
++++ b/backend/src/Helper/DateHelper.php
+@@ -0,0 +1,33 @@
++<?php
++
++namespace App\Helper;
++
++class DateHelper
++{
++    /**
++     * Calculates working days between two dates (including both).
++     *
++     * @param string[] $holidays dates in Y-m-d format
++     */
++    public static function calc(\DateTimeInterface $from, \DateTimeInterface $to, array $holidays = []): int
++    {
++        $count = 0;
++        $current = \DateTime::createFromInterface($from);
++
++        while ($current <= $to) {
++            $dayOfWeek = (int) $current->format('N');
++            // 6 = saturday, 7 = sunday
++            if ($dayOfWeek < 6 && !in_array($current->format('Y-m-d'), $holidays)) {
++                ++$count;
++            }
++            $current->modify('+1 day');
++        }
++
++        return $count;
++    }
++
++    public static function toString(?\DateTimeInterface $date): string
++    {
++        return $date ? $date->format('d.m.Y') : '';
++    }
++}
+diff --git a/backend/src/Mapper/LeaveRequestMapper.php b/backend/src/Mapper/LeaveRequestMapper.php
+new file mode 100644
+index 0000000..d9b03c5
+--- /dev/null
++++ b/backend/src/Mapper/LeaveRequestMapper.php
+@@ -0,0 +1,31 @@
++<?php
++
++namespace App\Mapper;
++
++use App\Dto\LeaveRequestDTO;
++
++class LeaveRequestMapper
++{
++    /**
++     * Maps request data to DTO.
++     */
++    public function map(array $data): LeaveRequestDTO
++    {
++        $holidayRequest = new LeaveRequestDTO();
++        $holidayRequest->startDate = $data['startDate'] ?? null;
++        $holidayRequest->endDate = $data['endDate'] ?? null;
++
++        // empty comment is saved as null
++        if (isset($data['comment']) && '' !== trim($data['comment'])) {
++            $holidayRequest->comment = $data['comment'];
++        } else {
++            $holidayRequest->comment = null;
++        }
++
++        if (null === $holidayRequest->startDate || null === $holidayRequest->endDate) {
++            throw new \InvalidArgumentException('Вкажіть дати у форматі РРРР-ММ-ДД.');
++        }
++
++        return $holidayRequest;
++    }
++}
+diff --git a/backend/src/Notification/EmployeeNotificationStrategy.php b/backend/src/Notification/EmployeeNotificationStrategy.php
+new file mode 100644
+index 0000000..89b148c
+--- /dev/null
++++ b/backend/src/Notification/EmployeeNotificationStrategy.php
+@@ -0,0 +1,43 @@
++<?php
++
++namespace App\Notification;
++
++use App\Entity\Leave;
++use App\Helper\DateHelper;
++use Symfony\Component\Mailer\MailerInterface;
++use Symfony\Component\Mime\Email;
++
++/**
++ * Notifies employee about decision on his absence.
++ */
++class EmployeeNotificationStrategy implements NotificationStrategyInterface
++{
++    public function __construct(private MailerInterface $mailer)
++    {
++    }
++
++    public function supports(string $type): bool
++    {
++        return in_array($type, [self::TYPE_APPROVED, self::TYPE_REJECTED]);
++    }
++
++    public function send(Leave $absence, string $type, array $context = []): void
++    {
++        $period = DateHelper::toString($absence->getStartDate()).' – '.DateHelper::toString($absence->getEndDate());
++
++        if ('approved' == $type) {
++            $subject = 'Заяву погоджено';
++            $text = "Вашу заяву на відпустку ($period) погоджено.";
++        } else {
++            $subject = 'Заяву відхилено';
++            $text = "Вашу заяву на відпустку ($period) відхилено.\nПричина: ".($context['reason'] ?? $absence->getRejectionReason());
++        }
++
++        $email = (new Email())
++            ->to($absence->getEmployee()->getEmail())
++            ->subject($subject)
++            ->text($text);
++
++        $this->mailer->send($email);
++    }
++}
+diff --git a/backend/src/Notification/ManagerNotificationStrategy.php b/backend/src/Notification/ManagerNotificationStrategy.php
+new file mode 100644
+index 0000000..f4cfc3d
+--- /dev/null
++++ b/backend/src/Notification/ManagerNotificationStrategy.php
+@@ -0,0 +1,46 @@
++<?php
++
++namespace App\Notification;
++
++use App\Entity\Leave;
++use Symfony\Component\Mailer\MailerInterface;
++use Symfony\Component\Mime\Email;
++
++/**
++ * Notifies team manager about new leave request.
++ */
++class ManagerNotificationStrategy implements NotificationStrategyInterface
++{
++    public function __construct(private MailerInterface $mailer)
++    {
++    }
++
++    public function supports(string $type): bool
++    {
++        return self::TYPE_NEW_REQUEST == $type;
++    }
++
++    public function send(Leave $leave, string $type, array $context = []): void
++    {
++        $employee = $leave->getEmployee();
++        $manager = $employee->getTeam()->getManager();
++
++        // no manager - nobody to notify
++        if (!$manager) {
++            return;
++        }
++
++        $text = $employee->getName().' подає заяву на відпустку з '.$leave->getStartDate()->format('d.m.Y').' по '.$leave->getEndDate()->format('d.m.Y').".\n";
++        $text .= 'Робочих днів: '.$leave->getDays().".\n";
++        if ($leave->getComment()) {
++            $text .= 'Коментар: '.$leave->getComment()."\n";
++        }
++
++        $email = (new Email())
++            ->to($manager->getEmail())
++            ->subject('Нова заява на відпустку')
++            ->text($text);
++
++        $this->mailer->send($email);
++    }
++}
+diff --git a/backend/src/Notification/NotificationManager.php b/backend/src/Notification/NotificationManager.php
+new file mode 100644
+index 0000000..d0a670e
+--- /dev/null
++++ b/backend/src/Notification/NotificationManager.php
+@@ -0,0 +1,30 @@
++<?php
++
++namespace App\Notification;
++
++use App\Entity\Leave;
++use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
++
++/**
++ * Sends notifications about leave requests using registered strategies.
++ */
++class NotificationManager
++{
++    /**
++     * @param iterable<NotificationStrategyInterface> $strategies
++     */
++    public function __construct(
++        #[AutowireIterator(NotificationStrategyInterface::class)]
++        private iterable $strategies,
++    ) {
++    }
++
++    public function notify(string $type, Leave $leave, array $context = []): void
++    {
++        foreach ($this->strategies as $strategy) {
++            if ($strategy->supports($type)) {
++                $strategy->send($leave, $type, $context);
++            }
++        }
++    }
++}
+diff --git a/backend/src/Notification/NotificationStrategyInterface.php b/backend/src/Notification/NotificationStrategyInterface.php
+new file mode 100644
+index 0000000..d888054
+--- /dev/null
++++ b/backend/src/Notification/NotificationStrategyInterface.php
+@@ -0,0 +1,18 @@
++<?php
++
++namespace App\Notification;
++
++use App\Entity\Leave;
++use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
++
++#[AutoconfigureTag(NotificationStrategyInterface::class)]
++interface NotificationStrategyInterface
++{
++    public const TYPE_NEW_REQUEST = 'new_request';
++    public const TYPE_APPROVED = 'approved';
++    public const TYPE_REJECTED = 'rejected';
++
++    public function supports(string $type): bool;
++
++    public function send(Leave $leave, string $type, array $context = []): void;
++}
+diff --git a/backend/src/Repository/LeaveRepository.php b/backend/src/Repository/LeaveRepository.php
+new file mode 100644
+index 0000000..c91396c
+--- /dev/null
++++ b/backend/src/Repository/LeaveRepository.php
+@@ -0,0 +1,65 @@
++<?php
++
++namespace App\Repository;
++
++use App\Entity\Employee;
++use App\Entity\Leave;
++use App\Entity\Team;
++use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
++use Doctrine\Persistence\ManagerRegistry;
++
++/**
++ * @extends ServiceEntityRepository<Leave>
++ */
++class LeaveRepository extends ServiceEntityRepository
++{
++    public function __construct(ManagerRegistry $registry)
++    {
++        parent::__construct($registry, Leave::class);
++    }
++
++    public function save(Leave $entity, bool $flush = false): void
++    {
++        $this->getEntityManager()->persist($entity);
++
++        if ($flush) {
++            $this->getEntityManager()->flush();
++        }
++    }
++
++    /**
++     * Leaves of employee in year.
++     *
++     * @return Leave[]
++     */
++    public function loadLeaves(Employee $employee, int $year): array
++    {
++        return $this->createQueryBuilder('l')
++            ->where('l.employee = :employee')
++            ->andWhere('l.startDate >= :from')
++            ->andWhere('l.startDate <= :to')
++            ->setParameter('employee', $employee)
++            ->setParameter('from', $year.'-01-01')
++            ->setParameter('to', $year.'-12-31')
++            ->orderBy('l.startDate', 'ASC')
++            ->addOrderBy('l.id', 'ASC')
++            ->getQuery()
++            ->getResult();
++    }
++
++    /**
++     * @return Leave[]
++     */
++    public function findPendingHolidayRequestsByTeam(Team $team): array
++    {
++        return $this->createQueryBuilder('v')
++            ->join('v.employee', 'e')
++            ->where('e.team = :team')
++            ->andWhere("v.status = 'pending'")
++            ->setParameter('team', $team)
++            ->orderBy('v.startDate', 'ASC')
++            ->addOrderBy('v.id', 'ASC')
++            ->getQuery()
++            ->getResult();
++    }
++}
+diff --git a/backend/src/Service/LeaveService.php b/backend/src/Service/LeaveService.php
+new file mode 100644
+index 0000000..df6e701
+--- /dev/null
++++ b/backend/src/Service/LeaveService.php
+@@ -0,0 +1,47 @@
++<?php
++
++namespace App\Service;
++
++use App\Entity\Employee;
++use App\Entity\Leave;
++use App\Entity\Team;
++use App\Repository\LeaveRepository;
++
++class LeaveService implements LeaveServiceInterface
++{
++    public function __construct(private LeaveRepository $leaveRepository)
++    {
++    }
++
++    /**
++     * Get vacations of employee for year.
++     */
++    public function getVacations(Employee $employee, int $year): array
++    {
++        return $this->leaveRepository->loadLeaves($employee, $year);
++    }
++
++    /**
++     * Get leave by id.
++     */
++    public function getLeave(int $id): ?Leave
++    {
++        return $this->leaveRepository->find($id);
++    }
++
++    /**
++     * Get pending requests of team.
++     */
++    public function getTeamRequests(Team $team): array
++    {
++        return $this->leaveRepository->findPendingHolidayRequestsByTeam($team);
++    }
++
++    /**
++     * Save leave.
++     */
++    public function save(Leave $leave): void
++    {
++        $this->leaveRepository->save($leave, true);
++    }
++}
+diff --git a/backend/src/Service/LeaveServiceInterface.php b/backend/src/Service/LeaveServiceInterface.php
+new file mode 100644
+index 0000000..82f13f9
+--- /dev/null
++++ b/backend/src/Service/LeaveServiceInterface.php
+@@ -0,0 +1,24 @@
++<?php
++
++namespace App\Service;
++
++use App\Entity\Employee;
++use App\Entity\Leave;
++use App\Entity\Team;
++
++interface LeaveServiceInterface
++{
++    /**
++     * @return Leave[]
++     */
++    public function getVacations(Employee $employee, int $year): array;
++
++    public function getLeave(int $id): ?Leave;
++
++    /**
++     * @return Leave[]
++     */
++    public function getTeamRequests(Team $team): array;
++
++    public function save(Leave $leave): void;
++}
+diff --git a/backend/src/Service/LeaveStatusResolver.php b/backend/src/Service/LeaveStatusResolver.php
+new file mode 100644
+index 0000000..15b5335
+--- /dev/null
++++ b/backend/src/Service/LeaveStatusResolver.php
+@@ -0,0 +1,21 @@
++<?php
++
++namespace App\Service;
++
++use App\Entity\Employee;
++
++/**
++ * Resolves status of new leave request.
++ */
++class LeaveStatusResolver
++{
++    public static function resolve(Employee $employee): string
++    {
++        // manager does not need approval
++        if ($employee->isManager()) {
++            return 'approved';
++        }
++
++        return 'pending';
++    }
++}
+diff --git a/backend/tests/Api/LeaveTest.php b/backend/tests/Api/LeaveTest.php
+new file mode 100644
+index 0000000..4c3fdd2
+--- /dev/null
++++ b/backend/tests/Api/LeaveTest.php
+@@ -0,0 +1,55 @@
++<?php
++
++namespace App\Tests\Api;
++
++class LeaveTest extends ApiTestCase
++{
++    public function testLeave1(): void
++    {
++        self::mockTime('2026-03-02 10:00');
++        $team = $this->createTeam();
++        $olena = $this->createEmployee('Олена Коваль', $team);
++        $team->assignManager($olena);
++        $taras = $this->createEmployee('Тарас Мельник', $team);
++        $this->entityManager->flush();
++
++        $response = $this->requestAs($taras, 'POST', '/api/leave-requests', ['startDate' => '2026-03-09', 'endDate' => '2026-03-13']);
++
++        self::assertResponseStatusCodeSame(201);
++        self::assertEquals(5, $response['workingDays']);
++        self::assertEquals('pending', $response['status']);
++    }
++
++    public function testIt(): void
++    {
++        self::mockTime('2026-03-02 10:00');
++        $team = $this->createTeam();
++        $olena = $this->createEmployee('Олена Коваль', $team);
++        $team->assignManager($olena);
++        $taras = $this->createEmployee('Тарас Мельник', $team);
++        $this->entityManager->flush();
++
++        $this->requestAs($taras, 'POST', '/api/leave-requests', ['startDate' => '2026-03-09', 'endDate' => '2026-03-10', 'comment' => 'test']);
++        $response = $this->requestAs($taras, 'GET', '/api/leave-requests');
++
++        self::assertResponseIsSuccessful();
++        self::assertCount(1, $response['requests']);
++        self::assertEquals(22, $response['balance']['remaining']);
++    }
++
++    public function testApprove(): void
++    {
++        self::mockTime('2026-03-02 10:00');
++        $team = $this->createTeam();
++        $olena = $this->createEmployee('Олена Коваль', $team);
++        $team->assignManager($olena);
++        $taras = $this->createEmployee('Тарас Мельник', $team);
++        $this->entityManager->flush();
++
++        $leave = $this->requestAs($taras, 'POST', '/api/leave-requests', ['startDate' => '2026-03-09', 'endDate' => '2026-03-13']);
++        $response = $this->requestAs($olena, 'POST', '/api/team/leave-requests/'.$leave['id'].'/approve');
++
++        self::assertResponseIsSuccessful();
++        self::assertEquals('approved', $response['status']);
++    }
++}
+diff --git a/frontend/src/App.vue b/frontend/src/App.vue
+index 3ac8991..fe8c002 100644
+--- a/frontend/src/App.vue
++++ b/frontend/src/App.vue
+@@ -1,13 +1,39 @@
+ <script setup lang="ts">
+-import { useRouter } from 'vue-router'
++import { ref, watch } from 'vue'
++import { useRoute, useRouter } from 'vue-router'
+ import { isSignedIn, signOut } from './session'
++import { getEmployeeId } from './utils'
+ 
+ const router = useRouter()
++const route = useRoute()
++const isManager = ref(false)
+ 
+ function leave() {
+   signOut()
+   router.push('/login')
+ }
++
++// check if current employee is manager (to show team requests link)
++watch(
++  () => route.path,
++  async () => {
++    const id = getEmployeeId()
++    if (!id) {
++      isManager.value = false
++      return
++    }
++    try {
++      const res = await fetch('/api/me', { headers: { 'X-Employee-Id': id } })
++      if (res.ok) {
++        const me = await res.json()
++        isManager.value = me.isManager
++      }
++    } catch (e) {
++      console.log(e)
++    }
++  },
++  { immediate: true },
++)
+ </script>
+ 
+ <template>
+@@ -15,6 +41,8 @@ function leave() {
+     <nav>
+       <RouterLink to="/">Головна</RouterLink>
+       <RouterLink to="/team">Команда</RouterLink>
++      <RouterLink to="/leave">Відпустки</RouterLink>
++      <RouterLink v-if="isManager" to="/team/leave">Заяви команди</RouterLink>
+     </nav>
+     <button type="button" @click="leave">Вийти</button>
+   </header>
+diff --git a/frontend/src/pages/LeavePage.vue b/frontend/src/pages/LeavePage.vue
+new file mode 100644
+index 0000000..662ac15
+--- /dev/null
++++ b/frontend/src/pages/LeavePage.vue
+@@ -0,0 +1,426 @@
++<script setup lang="ts">
++import { onMounted, ref, watch } from 'vue'
++import { getErrorMessage } from '@/utils'
++
++const props = withDefaults(defineProps<{ mode?: string }>(), { mode: 'my' })
++
++// eslint-disable-next-line @typescript-eslint/no-explicit-any
++const leaves = ref<any[]>([])
++// eslint-disable-next-line @typescript-eslint/no-explicit-any
++const balance = ref<any>(null)
++// eslint-disable-next-line @typescript-eslint/no-explicit-any
++const teamRequests = ref<any[]>([])
++const loading = ref(false)
++const error = ref('')
++
++// new request form
++const startDate = ref('')
++const endDate = ref('')
++const comment = ref('')
++const sending = ref(false)
++
++// reject form
++const rejectId = ref<number | null>(null)
++const rejectReason = ref('')
++const deciding = ref(false)
++
++function formatDate(date: string) {
++  if (!date) {
++    return ''
++  }
++  const parts = date.split('-')
++  return parts[2] + '.' + parts[1] + '.' + parts[0]
++}
++
++async function loadLeaves() {
++  loading.value = true
++  try {
++    const res = await fetch('/api/leave-requests', {
++      headers: {
++        'Content-Type': 'application/json',
++        'X-Employee-Id': localStorage.getItem('employeeId') || '',
++      },
++    })
++    const data = await res.json()
++    if (!res.ok) {
++      error.value = data.error || 'Не вдалося завантажити заяви.'
++      return
++    }
++    leaves.value = data.requests
++    balance.value = data.balance
++  } catch (e) {
++    console.log(e)
++    error.value = 'Не вдалося завантажити заяви.'
++  } finally {
++    loading.value = false
++  }
++}
++
++async function loadTeamRequests() {
++  loading.value = true
++  try {
++    const res = await fetch('/api/team/leave-requests', {
++      headers: {
++        'Content-Type': 'application/json',
++        'X-Employee-Id': localStorage.getItem('employeeId') || '',
++      },
++    })
++    const data = await res.json()
++    if (!res.ok) {
++      error.value = data.error || 'Не вдалося завантажити заяви команди.'
++      return
++    }
++    teamRequests.value = data
++  } catch (e) {
++    console.log(e)
++    error.value = 'Не вдалося завантажити заяви команди.'
++  } finally {
++    loading.value = false
++  }
++}
++
++async function submit() {
++  error.value = ''
++  sending.value = true
++  try {
++    // eslint-disable-next-line @typescript-eslint/no-explicit-any
++    const body: any = {
++      startDate: startDate.value,
++      endDate: endDate.value,
++    }
++    if (comment.value) {
++      body.comment = comment.value
++    }
++    const res = await fetch('/api/leave-requests', {
++      method: 'POST',
++      headers: {
++        'Content-Type': 'application/json',
++        'X-Employee-Id': localStorage.getItem('employeeId') || '',
++      },
++      body: JSON.stringify(body),
++    })
++    if (!res.ok) {
++      const data = await res.json().catch(() => ({}))
++      error.value = data.error || 'Не вдалося подати заяву.'
++      return
++    }
++    // clear form
++    startDate.value = ''
++    endDate.value = ''
++    comment.value = ''
++    await loadLeaves()
++  } catch (e) {
++    error.value = getErrorMessage(e)
++  } finally {
++    sending.value = false
++  }
++}
++
++async function cancelLeave(id: number) {
++  error.value = ''
++  try {
++    const res = await fetch('/api/leave-requests/' + id + '/cancel', {
++      method: 'POST',
++      headers: {
++        'Content-Type': 'application/json',
++        'X-Employee-Id': localStorage.getItem('employeeId') || '',
++      },
++    })
++    if (!res.ok) {
++      const data = await res.json().catch(() => ({}))
++      error.value = data.error || 'Не вдалося скасувати заяву.'
++      return
++    }
++    await loadLeaves()
++  } catch (e) {
++    error.value = getErrorMessage(e)
++  }
++}
++
++async function approve(id: number) {
++  error.value = ''
++  deciding.value = true
++  try {
++    const res = await fetch(`/api/team/leave-requests/${id}/approve`, {
++      method: 'POST',
++      headers: {
++        'Content-Type': 'application/json',
++        'X-Employee-Id': localStorage.getItem('employeeId') || '',
++      },
++    })
++    if (!res.ok) {
++      const data = await res.json().catch(() => ({}))
++      error.value = data.error || 'Не вдалося погодити заяву.'
++      return
++    }
++    // remove approved request from list
++    teamRequests.value = teamRequests.value.filter((r) => r.id !== id)
++  } catch (e) {
++    error.value = getErrorMessage(e)
++  } finally {
++    deciding.value = false
++  }
++}
++
++function startReject(id: number) {
++  rejectId.value = id
++  rejectReason.value = ''
++}
++
++async function confirmReject(id: number) {
++  error.value = ''
++  deciding.value = true
++  try {
++    const res = await fetch(`/api/team/leave-requests/${id}/reject`, {
++      method: 'POST',
++      headers: {
++        'Content-Type': 'application/json',
++        'X-Employee-Id': localStorage.getItem('employeeId') || '',
++      },
++      body: JSON.stringify({ reason: rejectReason.value }),
++    })
++    if (!res.ok) {
++      const data = await res.json().catch(() => ({}))
++      error.value = data.error || 'Не вдалося відхилити заяву.'
++      return
++    }
++    // remove rejected request from list
++    teamRequests.value = teamRequests.value.filter((r) => r.id !== id)
++    rejectId.value = null
++    rejectReason.value = ''
++  } catch (e) {
++    error.value = getErrorMessage(e)
++  } finally {
++    deciding.value = false
++  }
++}
++
++function load() {
++  error.value = ''
++  if (props.mode === 'team') {
++    loadTeamRequests()
++  } else {
++    loadLeaves()
++  }
++}
++
++onMounted(() => {
++  load()
++})
++
++// same component is used for /leave and /team/leave
++watch(
++  () => props.mode,
++  () => {
++    load()
++  },
++)
++</script>
++
++<template>
++  <div class="leave-page">
++    <template v-if="mode !== 'team'">
++      <h1>Мої відпустки</h1>
++      <p v-if="error" class="error" role="alert">{{ error }}</p>
++
++      <div v-if="balance" class="balance">
++        <div class="balance-item">Річна норма: {{ balance.allowance }}</div>
++        <div class="balance-item">Погоджено: {{ balance.approved }}</div>
++        <div class="balance-item">На розгляді: {{ balance.pending }}</div>
++        <div class="balance-item balance-remaining">Залишок: {{ balance.remaining }}</div>
++      </div>
++
++      <h2>Нова заява</h2>
++      <form class="leave-form" @submit.prevent="submit">
++        <label>
++          Дата початку
++          <input v-model="startDate" type="date" name="startDate" />
++        </label>
++        <label>
++          Дата завершення
++          <input v-model="endDate" type="date" name="endDate" />
++        </label>
++        <label class="comment-field">
++          Коментар
++          <textarea v-model="comment" name="comment" rows="2"></textarea>
++        </label>
++        <button type="submit" :disabled="sending">Подати заяву</button>
++      </form>
++
++      <h2>Заяви цього року</h2>
++      <p v-if="!loading && leaves.length === 0" class="empty">Заяв цього року немає.</p>
++      <ul v-else class="leave-list">
++        <li v-for="item in leaves" :key="item.id" class="leave-item">
++          <span class="period">{{ formatDate(item.startDate) }} – {{ formatDate(item.endDate) }}</span>
++          <span class="days">Робочих днів: {{ item.workingDays }}</span>
++          <span v-if="item.status === 'pending'" class="status status-pending">На розгляді</span>
++          <span v-else-if="item.status === 'approved'" class="status status-approved">Погоджено</span>
++          <span v-else-if="item.status === 'rejected'" class="status status-rejected">Відхилено</span>
++          <span v-else-if="item.status === 'cancelled'" class="status status-cancelled">Скасовано</span>
++          <span v-else class="status">{{ item.status }}</span>
++          <span v-if="item.comment" class="comment">{{ item.comment }}</span>
++          <span v-if="item.rejectionReason" class="reason">Причина відмови: {{ item.rejectionReason }}</span>
++          <button v-if="item.cancellable" type="button" class="cancel-button" @click="cancelLeave(item.id)">
++            Скасувати
++          </button>
++        </li>
++      </ul>
++    </template>
++
++    <template v-else>
++      <h1>Заяви команди</h1>
++      <p v-if="error" class="error" role="alert">{{ error }}</p>
++
++      <p v-if="!loading && teamRequests.length === 0" class="empty">Заяв на розгляді немає.</p>
++      <table v-else class="team-table">
++        <thead>
++          <tr>
++            <th>Працівник</th>
++            <th>Період</th>
++            <th>Робочих днів</th>
++            <th>Коментар</th>
++            <th></th>
++          </tr>
++        </thead>
++        <tbody>
++          <tr v-for="r in teamRequests" :key="r.id">
++            <td>{{ r.employee.name }}</td>
++            <td>
++              <span class="period">{{ formatDate(r.startDate) }} – {{ formatDate(r.endDate) }}</span>
++            </td>
++            <td>{{ r.workingDays }}</td>
++            <td>{{ r.comment ? r.comment : '—' }}</td>
++            <td class="actions">
++              <button type="button" :disabled="deciding" @click="approve(r.id)">Погодити</button>
++              <button type="button" :disabled="deciding" @click="startReject(r.id)">Відхилити</button>
++              <div v-if="rejectId === r.id" class="reject-form">
++                <label>
++                  Причина відмови
++                  <input v-model="rejectReason" name="reason" />
++                </label>
++                <button type="button" :disabled="deciding" @click="confirmReject(r.id)">Підтвердити відмову</button>
++              </div>
++            </td>
++          </tr>
++        </tbody>
++      </table>
++    </template>
++  </div>
++</template>
++
++<style scoped>
++.leave-page h2 {
++  margin-top: 2rem;
++}
++
++.balance {
++  display: flex;
++  gap: 1rem;
++  flex-wrap: wrap;
++}
++
++.balance-item {
++  padding: 0.75rem 1rem;
++  border: 1px solid #e4e7eb;
++  border-radius: 6px;
++  background: #f8fafc;
++}
++
++.balance-remaining {
++  font-weight: 600;
++}
++
++.leave-form {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: flex-end;
++  gap: 1rem;
++}
++
++.leave-form label {
++  display: flex;
++  flex-direction: column;
++  gap: 0.25rem;
++}
++
++.comment-field {
++  flex: 1 1 100%;
++}
++
++.comment-field textarea {
++  width: 100%;
++  box-sizing: border-box;
++}
++
++.leave-list {
++  list-style: none;
++  padding: 0;
++}
++
++.leave-item {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: center;
++  gap: 1rem;
++  padding: 0.75rem 0;
++  border-bottom: 1px solid #e4e7eb;
++}
++
++.period {
++  font-weight: 600;
++}
++
++.status {
++  padding: 0.125rem 0.5rem;
++  border-radius: 999px;
++  font-size: 0.875rem;
++}
++
++.status-pending {
++  background: #fef3c7;
++  color: #92400e;
++}
++
++.status-approved {
++  background: #dcfce7;
++  color: #166534;
++}
++
++.status-rejected {
++  background: #fee2e2;
++  color: #991b1b;
++}
++
++.status-cancelled {
++  background: #e5e7eb;
++  color: #374151;
++}
++
++.comment,
++.reason {
++  color: #52606d;
++}
++
++.empty {
++  color: #52606d;
++}
++
++.actions {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 0.5rem;
++}
++
++.reject-form {
++  display: flex;
++  align-items: flex-end;
++  gap: 0.5rem;
++  width: 100%;
++}
++
++.reject-form label {
++  display: flex;
++  flex-direction: column;
++  gap: 0.25rem;
++}
++</style>
+diff --git a/frontend/src/router.ts b/frontend/src/router.ts
+index fdfacb9..ecf27fb 100644
+--- a/frontend/src/router.ts
++++ b/frontend/src/router.ts
+@@ -3,6 +3,7 @@ import { isSignedIn } from './session'
+ import HomePage from './pages/HomePage.vue'
+ import LoginPage from './pages/LoginPage.vue'
+ import TeamPage from './pages/TeamPage.vue'
++import LeavePage from './pages/LeavePage.vue'
+ 
+ export const router = createRouter({
+   history: createWebHistory(),
+@@ -10,6 +11,8 @@ export const router = createRouter({
+     { path: '/login', component: LoginPage, meta: { public: true } },
+     { path: '/', component: HomePage },
+     { path: '/team', component: TeamPage },
++    { path: '/leave', component: LeavePage },
++    { path: '/team/leave', component: LeavePage, props: { mode: 'team' } },
+   ],
+ })
+ 
+diff --git a/frontend/src/utils.ts b/frontend/src/utils.ts
+new file mode 100644
+index 0000000..7a10c76
+--- /dev/null
++++ b/frontend/src/utils.ts
+@@ -0,0 +1,55 @@
++// Common helpers
++
++export const STATUSES: Record<string, string> = {
++  pending: 'На розгляді',
++  approved: 'Погоджено',
++  rejected: 'Відхилено',
++  cancelled: 'Скасовано',
++}
++
++export function getEmployeeId(): string | null {
++  return localStorage.getItem('employeeId')
++}
++
++// eslint-disable-next-line @typescript-eslint/no-explicit-any
++export function getErrorMessage(e: any): string {
++  if (e && e.message) {
++    return e.message
++  }
++  return 'Сталася помилка. Спробуйте ще раз.'
++}
++
++// 2026-10-05 -> 05.10.2026
++export function formatDateString(date: string): string {
++  const d = new Date(date)
++  const day = String(d.getDate()).padStart(2, '0')
++  const month = String(d.getMonth() + 1).padStart(2, '0')
++  return day + '.' + month + '.' + d.getFullYear()
++}
++
++// number of days between two dates including both
++export function daysBetween(start: string, end: string): number {
++  const ms = new Date(end).getTime() - new Date(start).getTime()
++  return Math.round(ms / (1000 * 60 * 60 * 24)) + 1
++}
++
++export function isEmpty(value: unknown): boolean {
++  return value === null || value === undefined || value === ''
++}
++
++export function sleep(ms: number): Promise<void> {
++  return new Promise((resolve) => setTimeout(resolve, ms))
++}
++
++// 1 день, 2 дні, 5 днів
++export function pluralize(n: number, one: string, few: string, many: string): string {
++  const mod10 = n % 10
++  const mod100 = n % 100
++  if (mod10 === 1 && mod100 !== 11) {
++    return one
++  }
++  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
++    return few
++  }
++  return many
++}

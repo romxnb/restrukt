@@ -85,8 +85,16 @@ class PackageContractTests(unittest.TestCase):
     def test_missing_naming_principle_breaks_all_consumers(self):
         (self.root / "skills/restrukt/methods/naming.md").unlink()
         errors = checker.check(self.root)
-        for consumer in ("references/apply.md", "references/plan.md", "references/review-code.md", "tools/names.md"):
+        for consumer in (
+            "references/apply.md", "references/plan.md", "references/implement.md", "references/handoff.md",
+            "references/review-code.md", "tools/names.md",
+        ):
             self.assertTrue(any(f"{consumer}: broken link:" in e for e in errors), consumer)
+
+    def test_missing_names_inventory_breaks_the_naming_method(self):
+        (self.root / "skills/restrukt/scripts/names.py").unlink()
+        errors = checker.check(self.root)
+        self.assertTrue(any("methods/naming.md: broken link:" in e for e in errors))
 
     def test_link_cycle_is_rejected(self):
         path = self.root / "skills/restrukt/references/review-code.md"
