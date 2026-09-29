@@ -6,7 +6,7 @@ ROOT=$(cd "$1" && pwd); OUT=$(mkdir -p "$2" && cd "$2" && pwd)
 HERE=$(cd "$(dirname "$0")" && pwd)
 DB="$OUT/e2e.db"; rm -f "$DB"
 export DATABASE_URL="sqlite:///$DB" APP_ENV=dev APP_DEBUG=0 MAILER_DSN=null://null
-(cd "$ROOT/backend" && php bin/console cache:clear -q && php bin/console doctrine:schema:create -q && php bin/console app:seed-demo -q) > "$OUT/seed.log" 2>&1
+(cd "$ROOT/backend" && rm -rf var/cache/dev && php bin/console cache:clear -q && php bin/console doctrine:schema:create -q && php bin/console app:seed-demo -q) > "$OUT/seed.log" 2>&1
 setsid bash -c "cd '$ROOT/backend' && exec php -d variables_order=EGPCS -S 127.0.0.1:8000 -t public" > "$OUT/backend.log" 2>&1 &
 BACKEND=$!
 setsid bash -c "cd '$ROOT/frontend' && npx vite build > '$OUT/build.log' 2>&1 && exec npx vite preview --port 4173 --strictPort" > "$OUT/preview.log" 2>&1 &
