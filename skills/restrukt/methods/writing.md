@@ -36,4 +36,4 @@
 | Рішення в змінах, у питаннях і в задачі | картка `R1`, решта посилається | одне знання — одне місце |
 | Абзац про залежності шести задач | граф Mermaid і таблиця | граф видно одразу |
 
-Спирається на [Information Mapping, Robert E. Horn](https://en.wikipedia.org/wiki/Information_mapping) (блоки, одна тема в блоці, мітки, послідовність, графіка поруч із текстом, деталі на місці потреби), [Diátaxis, Daniele Procida](https://diataxis.fr/) (розділення інструкції, довідки й пояснення), [Apple Style Guide](https://support.apple.com/guide/applestyleguide/welcome/web) (стислість, один термін — одне значення), практику книг [Manning](https://www.manning.com/) (визначення, рисунки з підписами) і перевернуту піраміду (спершу висновок). Відмінність сталого ID від позиції — [connascence](https://connascence.io/) назви проти позиції. Діаграми — [Mermaid](https://mermaid.js.org/). Першоджерела — для довідки.
+Спирається на Information Mapping, Robert E. Horn, Diátaxis, Daniele Procida, і перевернуту піраміду: спершу висновок.

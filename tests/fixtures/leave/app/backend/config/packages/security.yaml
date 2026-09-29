@@ -1,0 +1,21 @@
+security:
+    providers:
+        employees:
+            entity:
+                class: App\Entity\Employee
+                property: id
+
+    firewalls:
+        dev:
+            pattern: ^/(_profiler|_wdt|assets|build)/
+            security: false
+        main:
+            stateless: true
+            provider: employees
+            custom_authenticators:
+                - App\Security\EmployeeHeaderAuthenticator
+            entry_point: App\Security\EmployeeHeaderAuthenticator
+
+    access_control:
+        - { path: ^/api/employees$, methods: [GET], roles: PUBLIC_ACCESS }
+        - { path: ^/api, roles: ROLE_EMPLOYEE }

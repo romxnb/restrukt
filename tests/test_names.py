@@ -130,6 +130,52 @@ class ApproximateInventoryTests(unittest.TestCase):
         self.assertIn("розмите слово: manager", section(report, "Кандидати"))
         self.assertNotIn("hidden", report)
 
+    def test_php_numbers_keep_their_lines_and_skip_statuses_and_constants(self):
+        report = inventory({
+            "src/Shipping.php": """
+                <?php
+                /**
+                 * Delivery rules.
+                 */
+                final class Shipping
+                {
+                    private const FREE_FROM = 50;
+
+                    public function price(int $total): JsonResponse
+                    {
+                        $label = "Доставка за 7 днів";
+                        if ($total > 30) {
+                            return new JsonResponse(['price' => 0], 200);
+                        }
+                        return new JsonResponse(['error' => 'Замало'], 422);
+                    }
+                }
+            """,
+        })
+        unnamed = section(report, "Значення без назви")
+        self.assertIn("src/Shipping.php:13 30", unnamed)
+        self.assertNotIn(" 50", unnamed)
+        self.assertNotIn(" 7", unnamed)
+        self.assertNotIn(" 200", unnamed)
+        self.assertNotIn(" 422", unnamed)
+
+    def test_vue_styles_are_not_code(self):
+        report = inventory({
+            "src/Card.vue": """
+                <script setup lang="ts">
+                const retries = 3
+                </script>
+
+                <style scoped>
+                .card { z-index: 10; margin: 12px; }
+                </style>
+            """,
+        })
+        unnamed = section(report, "Значення без назви")
+        self.assertIn("src/Card.vue:3 3", unnamed)
+        self.assertNotIn(" 10", unnamed)
+        self.assertNotIn(" 12", unnamed)
+
 
 if __name__ == "__main__":
     unittest.main()

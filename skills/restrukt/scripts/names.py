@@ -146,11 +146,19 @@ TYPED = re.compile(r"\b([A-Za-z_$][\w$]*)\??\s*:\s*(string|number|boolean|bigint
                    r"(?:\s*\|\s*(?:null|undefined))?(?=\s*[,;)=\n}])")
 
 
+def blank(match: re.Match) -> str:
+    """Keep length and line breaks so positions in the stripped text match the source."""
+    body = re.sub(r"[^\n]", " ", match[0])
+    quote = match[0][0]
+    return quote + body[1:-1] + match[0][-1] if quote in "\"'`" and len(match[0]) > 1 else body
+
+
 def strip_literals(text: str) -> str:
-    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.S)
-    text = re.sub(r"(?m)(?<![:\"'])//.*$", " ", text)
-    text = re.sub(r"(?m)^\s*#.*$", " ", text)
-    return re.sub(r"`(?:\\.|[^`\\])*`|\"(?:\\.|[^\"\\\n])*\"|'(?:\\.|[^'\\\n])*'", '""', text)
+    text = re.sub(r"(?is)<style\b.*?</style>", blank, text)
+    text = re.sub(r"/\*.*?\*/", blank, text, flags=re.S)
+    text = re.sub(r"(?m)(?<![:\"'])//.*$", blank, text)
+    text = re.sub(r"(?m)^\s*#.*$", blank, text)
+    return re.sub(r"`(?:\\.|[^`\\])*`|\"(?:\\.|[^\"\\\n])*\"|'(?:\\.|[^'\\\n])*'", blank, text)
 
 
 def read_other(path: Path, place: str, scope: Scope) -> None:
@@ -162,6 +170,8 @@ def read_other(path: Path, place: str, scope: Scope) -> None:
         scope.codes[code].add(place)
     if not TEST_PATH.search(place):
         for match in re.finditer(r"(?<![\w.$])(\d+\.\d+|[2-9]\d*|1\d+)(?![\w.])", strip_literals(raw)):
+            if "." not in match[1] and 100 <= int(match[1]) <= 599:
+                continue  # HTTP statuses
             line = raw.count("\n", 0, match.start()) + 1
             before = raw[raw.rfind("\n", 0, match.start()) + 1:match.start()]
             if not re.search(r"\b[A-Z][A-Z0-9_]*\s*[:=]\s*$|\b(const|static final)\b.*\b[A-Z][A-Z0-9_]*\b", before):

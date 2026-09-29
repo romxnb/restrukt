@@ -80,12 +80,4 @@ python3 <корінь плагіна>/skills/restrukt/scripts/names.py <теки
 
 ## Джерела
 
-Для довідки; під час роботи достатньо правил вище.
-
-- [How Developers Choose Names, Feitelson та ін.](https://arxiv.org/abs/2103.07487)
-- [Linguistic Antipatterns, Venera Arnaoudova](https://www.linguistic-antipatterns.com/)
-- [Shorter Identifier Names Take Longer to Comprehend, Hofmeister та ін.](https://brains-on-code.github.io/shorter-identifier-names.pdf); огляд трьох досліджень — [Never Work in Theory](https://neverworkintheory.org/2021/08/09/abbreviated-vs-full-names.html)
-- [What's in a name, Andrew Gerrand](https://go.dev/talks/2014/names.slide); [Go Style Decisions](https://google.github.io/styleguide/go/decisions.html); [Package names, Sameer Ajmani](https://go.dev/blog/package-names)
-- [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions); [Linux kernel coding style](https://docs.kernel.org/process/coding-style.html)
-- Clean Code, розділ 2 і евристики N1–N7, G25, Robert C. Martin; Code Complete, 2nd ed., розділ 11, Steve McConnell; The Art of Readable Code, розділи 2–3, Boswell і Foucher
-- The Practice of Programming, Kernighan і Pike; A Philosophy of Software Design, John Ousterhout; Screaming Architecture, Robert C. Martin; The Programmer's Brain, Felienne Hermans; Domain-Driven Design, Eric Evans — Ubiquitous Language
+Для довідки; під час роботи достатньо правил вище. Clean Code, розділ 2; Code Complete, розділ 11; The Art of Readable Code, розділи 2–3; PEP 8 і Go Style Decisions про назви; Linguistic Antipatterns, Venera Arnaoudova; How Developers Choose Names, Feitelson та ін.; Domain-Driven Design — Ubiquitous Language.
