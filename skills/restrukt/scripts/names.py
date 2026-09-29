@@ -99,6 +99,10 @@ def read_python(path: Path, place: str, scope: Scope) -> None:
         at = f"{place}:{getattr(node, 'lineno', 0)}"
         if isinstance(node, ast.ClassDef):
             scope.add(node.name, at)
+            bases = {ast.unparse(base).rsplit(".", 1)[-1] for base in node.bases}
+            if any(b in ("Exception", "BaseException") or b.endswith(("Error", "Exception")) for b in bases) \
+                    and not node.name.endswith(("Error", "Exception", "Warning", "Exit", "Interrupt")):
+                scope.candidates.append(f"{at} `{node.name}` — виняток без суфікса `Error`")
             for item in node.body:
                 if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
                     scope.add(item.target.id, f"{place}:{item.lineno}", value_type=annotation(item.annotation))

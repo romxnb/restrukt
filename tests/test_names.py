@@ -58,6 +58,13 @@ PYTHON = {
     "shop/messages.py": """
         MESSAGES = {"OUT_OF_STOCK": "Немає на складі"}
     """,
+    "shop/errors.py": """
+        class Refused(Exception):
+            pass
+
+        class OutOfStockError(Exception):
+            pass
+    """,
     "tests/test_shop.py": """
         def test_1():
             assert late_fee(20) == 4.0
@@ -85,6 +92,11 @@ class PythonInventoryTests(unittest.TestCase):
 
     def test_confusable_letter_is_a_candidate(self):
         self.assertIn("`l` — літеру легко сплутати з цифрою", section(self.report, "Кандидати"))
+
+    def test_exception_without_error_suffix_is_a_candidate(self):
+        candidates = section(self.report, "Кандидати")
+        self.assertIn("`Refused` — виняток без суфікса `Error`", candidates)
+        self.assertNotIn("`OutOfStockError`", candidates)
 
     def test_unnamed_numbers_and_shared_codes_are_listed(self):
         unnamed = section(self.report, "Значення без назви")
